@@ -24,9 +24,29 @@ st.set_page_config(
 apply_theme()
 
 
+def ensure_national_metrics(national: pd.DataFrame) -> pd.DataFrame:
+    national = national.copy()
+    national["imports_twh"] = national.get("imports_twh", 0)
+    national["exports_twh"] = national.get("exports_twh", 0)
+
+    if "domestic_gap_twh" not in national:
+        national["domestic_gap_twh"] = national["production_twh"] - national["consumption_twh"]
+    if "net_balance_twh" not in national:
+        national["net_balance_twh"] = (
+            national["production_twh"] + national["imports_twh"] - national["consumption_twh"] - national["exports_twh"]
+        )
+    if "surplus_deficit_twh" not in national:
+        national["surplus_deficit_twh"] = national["domestic_gap_twh"]
+    if "hydro_share_pct" not in national:
+        national["hydro_share_pct"] = national["hydro_twh"] / national["production_twh"] * 100
+
+    return national
+
+
 @st.cache_data(ttl=3600)
 def get_data() -> tuple[pd.DataFrame, pd.DataFrame, list]:
     national, statuses = load_energy_dataset()
+    national = ensure_national_metrics(national)
     regional = load_regional_dataset()
     return national, regional, statuses
 
