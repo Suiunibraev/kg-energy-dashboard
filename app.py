@@ -51,18 +51,19 @@ st.markdown(
     "A Ministry-ready monitoring and forecasting tool for electricity production, consumption, regional demand, and seasonal planning."
 )
 
-metric_cols = st.columns(4)
+metric_cols = st.columns(5)
 metric_cols[0].metric("Total production", f"{latest['production_twh']:.1f} TWh")
 metric_cols[1].metric("Total consumption", f"{latest['consumption_twh']:.1f} TWh")
-metric_cols[2].metric("Surplus / deficit", f"{latest['surplus_deficit_twh']:.1f} TWh")
-metric_cols[3].metric("Hydropower share", f"{latest['hydro_share_pct']:.0f}%")
+metric_cols[2].metric("Surplus / deficit before trade", f"{latest['domestic_gap_twh']:.1f} TWh")
+metric_cols[3].metric("Balance after imports / exports", f"{latest['net_balance_twh']:.2f} TWh")
+metric_cols[4].metric("Hydropower share", f"{latest['hydro_share_pct']:.0f}%")
 
 tabs = st.tabs(["National monitoring", "Regional view", "Seasonal forecast", "Data and handoff"])
 
 with tabs[0]:
     st.subheader("National electricity trends")
     st.markdown(
-        '<p class="section-note">Compare production, consumption, hydropower reliance, and the annual balance over the selected period.</p>',
+        '<p class="section-note">Compare production, consumption, hydropower reliance, the domestic production gap, and the net balance after electricity trade.</p>',
         unsafe_allow_html=True,
     )
     left, right = st.columns([1.35, 1])
@@ -80,7 +81,9 @@ with tabs[0]:
                     "hydro_twh",
                     "thermal_twh",
                     "imports_twh",
-                    "surplus_deficit_twh",
+                    "exports_twh",
+                    "domestic_gap_twh",
+                    "net_balance_twh",
                     "hydro_share_pct",
                 ]
             ],
