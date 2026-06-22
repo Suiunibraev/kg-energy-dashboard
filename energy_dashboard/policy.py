@@ -280,6 +280,8 @@ def recommended_actions(
     deficit = max(0, -float(latest["domestic_gap_twh"]))
     winter_peak = float(peaks["winter_peak_twh"])
     high_region = regional_risk.iloc[0]["region"] if not regional_risk.empty else "highest-risk region"
+    high_region_score = float(regional_risk.iloc[0]["risk_score"]) if not regional_risk.empty else 0.0
+    high_region_risk = str(regional_risk.iloc[0]["risk"]) if not regional_risk.empty else "not available"
 
     actions = []
     if deficit > 0:
@@ -287,6 +289,7 @@ def recommended_actions(
             {
                 "Priority": "High",
                 "Recommended action": f"Secure winter import or reserve contracts covering at least {deficit * 0.25:.1f} TWh.",
+                "Trigger / evidence": f"Domestic deficit is {deficit:.1f} TWh before electricity trade.",
                 "Reason": "Domestic generation is below current consumption before trade.",
             }
         )
@@ -295,6 +298,10 @@ def recommended_actions(
             {
                 "Priority": "High",
                 "Recommended action": "Prepare dry-year hydropower contingency dispatch and maintenance schedule.",
+                "Trigger / evidence": (
+                    f"Hydropower share is {float(security['hydro_share_pct']):.1f}%, "
+                    f"above the {POLICY_RULES['hydro_vulnerability_pct']}% vulnerability threshold."
+                ),
                 "Reason": "Hydropower dependency creates seasonal and climate vulnerability.",
             }
         )
@@ -303,6 +310,10 @@ def recommended_actions(
             {
                 "Priority": "Medium",
                 "Recommended action": "Target winter demand-response measures for peak months.",
+                "Trigger / evidence": (
+                    f"Winter peak demand is {winter_peak:.2f} TWh, above the "
+                    f"{demand / 12 * 1.15:.2f} TWh peak threshold."
+                ),
                 "Reason": "Peak risk is concentrated in winter rather than annual totals.",
             }
         )
@@ -310,14 +321,24 @@ def recommended_actions(
         {
             "Priority": "Medium",
             "Recommended action": f"Prioritize grid reinforcement and loss reduction in {high_region}.",
+            "Trigger / evidence": (
+                f"{high_region} is the highest-risk region with a score of "
+                f"{high_region_score:.1f} ({high_region_risk} risk)."
+            ),
             "Reason": "Regional ranking combines deficits, demand concentration, and distribution losses.",
         }
     )
-    if not rules[rules["Status"].isin(["High", "Flagged"])].empty:
+    flagged_rules = rules[rules["Status"].isin(["High", "Flagged"])]
+    if not flagged_rules.empty:
+        evidence = "; ".join(
+            f"{row['Policy rule']}: {row['Current value']} ({row['Status']}; {row['Trigger']})"
+            for _, row in flagged_rules.iterrows()
+        )
         actions.append(
             {
                 "Priority": "Medium",
                 "Recommended action": "Review flagged policy rules in the weekly system planning meeting.",
+                "Trigger / evidence": evidence,
                 "Reason": "Auditable thresholds show which risks crossed predefined limits.",
             }
         )
