@@ -16,6 +16,7 @@ from energy_dashboard.policy import (
     security_index_breakdown,
     situation_briefing,
     time_intelligence,
+    year_over_year_summary,
 )
 from energy_dashboard.reporting import build_ministry_briefing_pdf
 from energy_dashboard.ui import (
@@ -111,6 +112,7 @@ security_breakdown = security_index_breakdown(filtered, forecast_df)
 peaks = peak_demand_summary(forecast_df)
 regional_risk = regional_risk_ranking(regional_df)
 time_df, changes = time_intelligence(filtered)
+changes_summary = year_over_year_summary(changes)
 rules = evaluate_policy_rules(filtered, security)
 briefing = situation_briefing(security, rules, changes)
 actions = recommended_actions(filtered, regional_risk, rules, peaks, security)
@@ -238,14 +240,14 @@ with tabs[0]:
         f"Total: {security['score']:.1f}/100 = "
         + " + ".join(security_breakdown["Contribution"].str.split(" / ").str[0])
     )
-    st.subheader("What changed in the latest year")
+    st.subheader("What Changed Since Last Year?")
     change_cols = st.columns(5)
     change_cols[0].metric("Demand YoY", f"{changes['demand_yoy_pct']:.1f}%")
     change_cols[1].metric("Production YoY", f"{changes['production_yoy_pct']:.1f}%")
     change_cols[2].metric("Net imports YoY", f"{changes['imports_yoy_pct']:.1f}%")
     change_cols[3].metric("Hydro share change", f"{changes['hydro_share_change_pct']:.1f} pp")
-    change_cols[4].metric("Demand trend deviation", f"{changes['seasonal_deviation_index']:.1f}%")
-    change_cols[4].caption("Latest demand compared with its 3-year rolling trend.")
+    change_cols[4].metric("Domestic gap change", f"{changes['domestic_gap_change_twh']:+.1f} TWh")
+    st.info(changes_summary)
 
 with tabs[1]:
     st.subheader("Policy rules and audit trail")

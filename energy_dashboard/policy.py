@@ -201,6 +201,9 @@ def time_intelligence(national: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, f
     ).fillna(0)
     latest = out.iloc[-1]
     previous = out.iloc[-2] if len(out) > 1 else latest
+    demand_change_twh = float(latest["consumption_twh"] - previous["consumption_twh"])
+    production_change_twh = float(latest["production_twh"] - previous["production_twh"])
+    net_imports_change_twh = float(latest["net_imports_twh"] - previous["net_imports_twh"])
     changes = {
         "demand_yoy_pct": round(float(latest["demand_yoy_pct"] if pd.notna(latest["demand_yoy_pct"]) else 0), 1),
         "production_yoy_pct": round(
@@ -208,9 +211,35 @@ def time_intelligence(national: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, f
         ),
         "imports_yoy_pct": round(_pct_change(float(previous["net_imports_twh"]), float(latest["net_imports_twh"])), 1),
         "hydro_share_change_pct": round(float(latest["hydro_share_pct"] - previous["hydro_share_pct"]), 1),
+        "domestic_gap_change_twh": round(
+            float(latest["domestic_gap_twh"] - previous["domestic_gap_twh"]),
+            1,
+        ),
+        "demand_change_twh": round(demand_change_twh, 1),
+        "production_change_twh": round(production_change_twh, 1),
+        "net_imports_change_twh": round(net_imports_change_twh, 1),
         "seasonal_deviation_index": round(float(latest["seasonal_deviation_index"]), 1),
     }
     return out, changes
+
+
+def year_over_year_summary(changes: dict[str, float]) -> str:
+    gap_change = float(changes["domestic_gap_change_twh"])
+    gap_direction = "improved" if gap_change > 0 else "worsened" if gap_change < 0 else "was unchanged"
+    drivers = {
+        "production": float(changes["production_change_twh"]),
+        "demand": float(changes["demand_change_twh"]),
+        "net imports": float(changes["net_imports_change_twh"]),
+    }
+    main_driver = max(drivers, key=lambda name: abs(drivers[name]))
+    driver_change = drivers[main_driver]
+    movement = "increased" if driver_change > 0 else "decreased" if driver_change < 0 else "was unchanged"
+
+    return (
+        f"The domestic production gap {gap_direction} by {abs(gap_change):.1f} TWh. "
+        f"The largest year-over-year movement was {main_driver}, which {movement} by "
+        f"{abs(driver_change):.1f} TWh."
+    )
 
 
 def _pct_change(previous: float, current: float) -> float:
