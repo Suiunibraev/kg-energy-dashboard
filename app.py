@@ -137,24 +137,14 @@ baseline_scenario_outputs = {
     for name in SCENARIOS
 }
 scenario_impacts, scenario_impact_summary = scenario_impact_analysis(national_df, baseline_scenario_outputs)
+baseline_scenario_forecasts = pd.concat(
+    [forecast.query("period == 'Forecast'") for forecast in baseline_scenario_outputs.values()],
+    ignore_index=True,
+)
 
 st.title("Kyrgyzstan Energy Intelligence Dashboard")
 st.markdown(
     "For policymakers and energy planners: monitor Kyrgyzstan's electricity security, seasonal demand risk, imports, regional deficits, and forecast uncertainty."
-)
-
-briefing_pdf = build_ministry_briefing_pdf(
-    latest,
-    security,
-    briefing,
-    summary_text,
-    actions,
-    rules,
-    scenario_impacts,
-    scenario_impact_summary,
-    security_breakdown,
-    changes,
-    changes_summary,
 )
 
 if dashboard_section == "Executive Overview":
@@ -211,10 +201,76 @@ if dashboard_section == "Executive Overview":
 elif dashboard_section == "Energy Security Assessment":
     st.subheader("Energy Security Assessment")
     st.markdown(
-        '<p class="section-note">Forecast-informed assessment using the existing Normal-year baseline and '
-        "unchanged Energy Security Index methodology.</p>",
+        '<p class="section-note">The Security Index combines current electricity conditions with future demand '
+        "assumptions. Change the forecast scenario or horizon below to see how the assessment responds, using "
+        "the unchanged forecasting and Security Index methods.</p>",
         unsafe_allow_html=True,
     )
+    control_left, control_right = st.columns(2)
+    assessment_scenario = control_left.selectbox(
+        "Forecast Scenario",
+        list(SCENARIOS.keys()),
+        index=list(SCENARIOS.keys()).index(baseline_scenario),
+    )
+    assessment_months = control_right.slider(
+        "Forecast Horizon (months)",
+        6,
+        36,
+        baseline_months,
+        step=6,
+    )
+    assessment_forecast = forecast_demand(
+        national_df,
+        months=assessment_months,
+        scenario=assessment_scenario,
+    )
+    assessment_peaks = peak_demand_summary(assessment_forecast)
+    security = calculate_security_index(national_df, assessment_forecast)
+    security_breakdown = security_index_breakdown(national_df, assessment_forecast)
+    rules = evaluate_policy_rules(national_df, security)
+    briefing = situation_briefing(security, rules, changes)
+    actions = recommended_actions(
+        national_df,
+        regional_risk,
+        rules,
+        assessment_peaks,
+        security,
+    )
+    summary_text = executive_summary(
+        national_df,
+        assessment_forecast,
+        assessment_scenario,
+        security,
+    )
+    assessment_scenario_outputs = {
+        name: forecast_demand(national_df, months=assessment_months, scenario=name)
+        for name in SCENARIOS
+    }
+    scenario_impacts, scenario_impact_summary = scenario_impact_analysis(
+        national_df,
+        assessment_scenario_outputs,
+    )
+    briefing_pdf = build_ministry_briefing_pdf(
+        latest,
+        security,
+        briefing,
+        summary_text,
+        actions,
+        rules,
+        scenario_impacts,
+        scenario_impact_summary,
+        security_breakdown,
+        changes,
+        changes_summary,
+    )
+
+    st.info(
+        f"Current assessment uses the {assessment_scenario.lower()} assumption over a "
+        f"{assessment_months}-month forecast horizon. The Security Index reserve-margin component "
+        "uses up to the first 12 forecast months."
+    )
+
+    st.subheader("Current Security Assessment")
     assessment_cols = st.columns([0.9, 1.4])
     assessment_cols[0].plotly_chart(
         security_gauge(security["score"], security["label"]),
@@ -268,6 +324,23 @@ elif dashboard_section == "Energy Security Assessment":
         f"Total: {security['score']:.1f}/100 = "
         + " + ".join(security_breakdown["Contribution"].str.split(" / ").str[0])
     )
+
+    st.subheader("Scenario Sensitivity Analysis")
+    st.caption(
+        f"Comparison holds the forecast horizon at {assessment_months} months and changes only the existing "
+        "Dry, Normal, and Wet year assumptions. This shows how future assumptions influence the Security Index."
+    )
+    sensitivity_cols = st.columns(3)
+    for column, (_, scenario_row) in zip(sensitivity_cols, scenario_impacts.iterrows()):
+        column.metric(
+            scenario_row["Scenario"],
+            scenario_row["Security Index"],
+        )
+        column.write(f"**Risk level:** {scenario_row['Risk level']}")
+        column.caption(
+            f"Forecast demand: {scenario_row['Forecast demand']} · "
+            f"Estimated balance: {scenario_row['Net balance estimate']}"
+        )
 
     st.subheader("Recommended actions and evidence")
     st.dataframe(actions, width="stretch", hide_index=True)
@@ -445,27 +518,17 @@ elif dashboard_section == "Regional Planning":
 elif dashboard_section == "Scenario Planning":
     st.subheader("Forecast uncertainty and peak demand")
     st.markdown(
-        '<p class="section-note">Forecasts include confidence bands and scenario spread so planning decisions are not treated as certain. Monthly patterns are estimated from annual data and should be recalibrated with official monthly demand, reservoir, weather, and plant availability data.</p>',
+        '<p class="section-note">Forecast charts use the standard Normal-year, 18-month planning baseline. '
+        "Interactive Forecast Scenario and Forecast Horizon controls are available on the Energy Security Assessment page. "
+        "Monthly patterns are estimated from annual data and should be recalibrated with official monthly demand, reservoir, weather, and plant availability data.</p>",
         unsafe_allow_html=True,
     )
-    control_left, control_right = st.columns(2)
-    scenario = control_left.selectbox("Forecast Scenario", list(SCENARIOS.keys()), index=0)
-    months = control_right.slider("Forecast Horizon (months)", 6, 36, 18, step=6)
-    forecast_df = forecast_demand(national_df, months=months, scenario=scenario)
+    scenario = baseline_scenario
+    months = baseline_months
+    forecast_df = baseline_forecast
     future = forecast_df[forecast_df["period"].eq("Forecast")]
-    peaks = peak_demand_summary(forecast_df)
-    scenario_forecast_outputs = {
-        name: forecast_demand(national_df, months=months, scenario=name)
-        for name in SCENARIOS
-    }
-    scenario_forecasts = pd.concat(
-        [forecast.query("period == 'Forecast'") for forecast in scenario_forecast_outputs.values()],
-        ignore_index=True,
-    )
-    scenario_impacts, scenario_impact_summary = scenario_impact_analysis(
-        national_df,
-        scenario_forecast_outputs,
-    )
+    peaks = baseline_peaks
+    scenario_forecasts = baseline_scenario_forecasts
     peak_cols = st.columns(3)
     peak_cols[0].metric("Winter peak demand", f"{peaks['winter_peak_twh']:.2f} TWh")
     peak_cols[1].metric("Summer peak demand", f"{peaks['summer_peak_twh']:.2f} TWh")
