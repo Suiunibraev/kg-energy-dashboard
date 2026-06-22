@@ -101,6 +101,21 @@ selected_years = st.sidebar.slider("Years shown", year_min, year_max, (max(year_
 scenario = st.sidebar.selectbox("Planning scenario", list(SCENARIOS.keys()), index=0)
 months = st.sidebar.slider("Forecast horizon", 6, 36, 18, step=6)
 st.sidebar.divider()
+st.sidebar.subheader("Dashboard Sections")
+dashboard_section = st.sidebar.radio(
+    "Choose a section",
+    [
+        "Executive Overview",
+        "Policy Rules",
+        "National Monitoring",
+        "Regional Planning",
+        "Scenario Planning",
+        "Methodology",
+        "Data & Handoff",
+    ],
+    label_visibility="collapsed",
+)
+st.sidebar.divider()
 st.sidebar.caption("Data status")
 for status in source_statuses:
     label = "Live" if status.status == "live" else "Fallback"
@@ -215,19 +230,7 @@ st.download_button(
     mime="application/pdf",
 )
 
-tabs = st.tabs(
-    [
-        "Situation briefing",
-        "Policy rules",
-        "National monitoring",
-        "Regional view",
-        "Forecast uncertainty",
-        "Methodology",
-        "Data and handoff",
-    ]
-)
-
-with tabs[0]:
+if dashboard_section == "Executive Overview":
     st.subheader("Energy security overview")
     left, right = st.columns([0.9, 1.4])
     left.plotly_chart(security_gauge(security["score"], security["label"]), width="stretch")
@@ -258,7 +261,7 @@ with tabs[0]:
     change_cols[4].metric("Domestic gap change", f"{changes['domestic_gap_change_twh']:+.1f} TWh")
     st.info(changes_summary)
 
-with tabs[1]:
+elif dashboard_section == "Policy Rules":
     st.subheader("Policy rules and audit trail")
     st.markdown(
         '<p class="section-note">These thresholds make the index explainable and keep risk interpretation stable over time.</p>',
@@ -267,7 +270,7 @@ with tabs[1]:
     st.dataframe(rules, width="stretch", hide_index=True)
     st.plotly_chart(time_intelligence_chart(time_df), width="stretch")
 
-with tabs[2]:
+elif dashboard_section == "National Monitoring":
     st.subheader("National electricity trends")
     st.markdown(
         '<p class="section-note">Compare production, consumption, hydropower reliance, the domestic production gap, and the net balance after electricity trade.</p>',
@@ -302,7 +305,7 @@ with tabs[2]:
             hide_index=True,
         )
 
-with tabs[3]:
+elif dashboard_section == "Regional Planning":
     st.subheader("Regional electricity planning layer")
     st.markdown(
         '<p class="section-note">Regional ranking highlights where demand, deficits, distribution losses, population, and demand concentration create planning pressure.</p>',
@@ -403,7 +406,7 @@ with tabs[3]:
         "The difference confirms that the starter regional values are not a reconciled official allocation."
     )
 
-with tabs[4]:
+elif dashboard_section == "Scenario Planning":
     st.subheader("Forecast uncertainty and peak demand")
     st.markdown(
         '<p class="section-note">Forecasts include confidence bands and scenario spread so planning decisions are not treated as certain. Monthly patterns are estimated from annual data and should be recalibrated with official monthly demand, reservoir, weather, and plant availability data.</p>',
@@ -433,7 +436,7 @@ with tabs[4]:
     with st.expander("View forecast table"):
         st.dataframe(future, width="stretch", hide_index=True)
 
-with tabs[5]:
+elif dashboard_section == "Methodology":
     st.subheader("Dashboard methodology and interpretation")
     st.markdown(
         '<p class="section-note">This page explains how the dashboard turns available data into indicators, '
@@ -560,7 +563,7 @@ with tabs[5]:
         "Interpret scores, forecasts, regional rankings, and recommended actions as decision-support signals—not final decisions."
     )
 
-with tabs[6]:
+elif dashboard_section == "Data & Handoff":
     st.subheader("Data sources and implementation notes")
     source_html = "".join(
         f'<span class="source-pill">{status.name}: {"live" if status.status == "live" else "fallback"}'
