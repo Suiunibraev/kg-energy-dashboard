@@ -62,6 +62,69 @@ def calculate_security_index(national: pd.DataFrame, forecast: pd.DataFrame) -> 
     }
 
 
+def security_index_breakdown(national: pd.DataFrame, forecast: pd.DataFrame) -> pd.DataFrame:
+    """Return an auditable breakdown of the unchanged Energy Security Index."""
+    latest = national.sort_values("year").iloc[-1]
+    recent = national.sort_values("year").tail(6)
+    future = forecast[forecast["period"].eq("Forecast")].head(12)
+
+    balance_ratio = float(latest["production_twh"]) / float(latest["consumption_twh"])
+    balance_score = _clip(balance_ratio / 1.05, 0, 1) * 35
+
+    hydro_share = float(latest.get("hydro_share_pct", 0))
+    hydro_score = _clip(1 - max(0, hydro_share - 55) / 40, 0, 1) * 20
+
+    if len(recent) >= 2:
+        demand_growth = float(recent["consumption_twh"].pct_change().tail(5).mean())
+    else:
+        demand_growth = 0.0
+    growth_score = _clip((0.065 - demand_growth) / 0.055, 0, 1) * 20
+
+    forecast_demand = float(future["forecast_twh"].sum()) if not future.empty else float(latest["consumption_twh"])
+    reserve_margin = (float(latest["production_twh"]) - forecast_demand) / forecast_demand
+    reserve_score = _clip((reserve_margin + 0.20) / 0.35, 0, 1) * 25
+
+    rows = [
+        {
+            "Component": "Balance Score",
+            "Current indicator": f"{balance_ratio * 100:.1f}% production coverage",
+            "Weight": "35%",
+            "Contribution": f"{balance_score:.1f} / 35",
+            "Why it changed the score": (
+                "Higher domestic production coverage increases the score; full points require production equal to 105% of consumption."
+            ),
+        },
+        {
+            "Component": "Hydropower Risk Score",
+            "Current indicator": f"{hydro_share:.1f}% hydropower share",
+            "Weight": "20%",
+            "Contribution": f"{hydro_score:.1f} / 20",
+            "Why it changed the score": (
+                "Hydropower shares up to 55% receive full points; heavier reliance reduces the score because dry-year exposure increases."
+            ),
+        },
+        {
+            "Component": "Demand Growth Score",
+            "Current indicator": f"{demand_growth * 100:.1f}% average annual growth",
+            "Weight": "20%",
+            "Contribution": f"{growth_score:.1f} / 20",
+            "Why it changed the score": (
+                "Slower demand growth increases the score; faster growth reduces it because supply and network capacity must expand more quickly."
+            ),
+        },
+        {
+            "Component": "Reserve Margin Score",
+            "Current indicator": f"{reserve_margin * 100:.1f}% forecast reserve margin",
+            "Weight": "25%",
+            "Contribution": f"{reserve_score:.1f} / 25",
+            "Why it changed the score": (
+                "A larger forecast supply cushion increases the score; a negative margin reduces it because projected demand exceeds current production."
+            ),
+        },
+    ]
+    return pd.DataFrame(rows)
+
+
 def evaluate_policy_rules(national: pd.DataFrame, security: dict) -> pd.DataFrame:
     latest = national.sort_values("year").iloc[-1]
     demand = float(latest["consumption_twh"])

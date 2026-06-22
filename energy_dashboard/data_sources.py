@@ -163,8 +163,29 @@ def load_energy_dataset() -> tuple[pd.DataFrame, list[SourceStatus]]:
     return national.sort_values("year").reset_index(drop=True), statuses
 
 
+def load_official_regional_dataset() -> pd.DataFrame | None:
+    """Load future official Ministry regional electricity data.
+
+    TODO: Replace this stub when a stable Ministry file or API is available.
+    The normalized dataset must contain:
+    - year
+    - region
+    - lat
+    - lon
+    - production_gwh
+    - consumption_gwh
+    - distribution_losses_pct
+
+    Return ``None`` while no official regional source is configured so
+    ``load_regional_dataset()`` continues to use the packaged starter data.
+    """
+    return None
+
+
 def load_regional_dataset() -> pd.DataFrame:
-    regional = pd.read_csv(REGIONAL_STARTER_PATH)
+    regional = load_official_regional_dataset()
+    if regional is None:
+        regional = pd.read_csv(REGIONAL_STARTER_PATH)
     regional["balance_gwh"] = regional["production_gwh"] - regional["consumption_gwh"]
     regional["status"] = np.where(regional["balance_gwh"].ge(0), "Net producer", "Net consumer")
     return regional

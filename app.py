@@ -12,6 +12,7 @@ from energy_dashboard.policy import (
     peak_demand_summary,
     recommended_actions,
     regional_risk_ranking,
+    security_index_breakdown,
     situation_briefing,
     time_intelligence,
 )
@@ -105,6 +106,7 @@ latest = filtered.iloc[-1]
 forecast_df = forecast_demand(national_df, months=months, scenario=scenario)
 future = forecast_df[forecast_df["period"].eq("Forecast")]
 security = calculate_security_index(filtered, forecast_df)
+security_breakdown = security_index_breakdown(filtered, forecast_df)
 peaks = peak_demand_summary(forecast_df)
 regional_risk = regional_risk_ranking(regional_df)
 time_df, changes = time_intelligence(filtered)
@@ -205,6 +207,22 @@ with tabs[0]:
     left.plotly_chart(security_gauge(security["score"], security["label"]), width="stretch")
     right.subheader("Recommended actions")
     right.dataframe(actions, width="stretch", hide_index=True)
+    st.subheader("How the Security Index is calculated")
+    st.caption(
+        "The final score is the sum of four weighted contributions. Higher component scores indicate stronger energy security."
+    )
+    breakdown_cols = st.columns(4)
+    for column, (_, component) in zip(breakdown_cols, security_breakdown.iterrows()):
+        column.metric(
+            component["Component"],
+            component["Contribution"],
+        )
+        column.caption(f"Weight: {component['Weight']} · {component['Current indicator']}")
+        column.write(component["Why it changed the score"])
+    st.caption(
+        f"Total: {security['score']:.1f}/100 = "
+        + " + ".join(security_breakdown["Contribution"].str.split(" / ").str[0])
+    )
     st.subheader("What changed in the latest year")
     change_cols = st.columns(5)
     change_cols[0].metric("Demand YoY", f"{changes['demand_yoy_pct']:.1f}%")
