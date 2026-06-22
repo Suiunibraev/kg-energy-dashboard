@@ -94,13 +94,7 @@ try:
 except Exception as exc:  # noqa: BLE001 - user-facing dashboard should fail clearly.
     stop_with_data_error(exc)
 
-st.sidebar.title("Dashboard controls")
-year_min = int(national_df["year"].min())
-year_max = int(national_df["year"].max())
-selected_years = st.sidebar.slider("Years shown", year_min, year_max, (max(year_min, year_max - 12), year_max))
-scenario = st.sidebar.selectbox("Planning scenario", list(SCENARIOS.keys()), index=0)
-months = st.sidebar.slider("Forecast horizon", 6, 36, 18, step=6)
-st.sidebar.divider()
+st.sidebar.title("Dashboard Navigation")
 st.sidebar.subheader("Dashboard Sections")
 dashboard_section = st.sidebar.radio(
     "Choose a section",
@@ -123,29 +117,25 @@ for status in source_statuses:
     if status.last_updated:
         st.sidebar.caption(f"Loaded at {status.last_updated}")
 
-filtered = national_df[national_df["year"].between(selected_years[0], selected_years[1])].copy()
-latest = filtered.iloc[-1]
-forecast_df = forecast_demand(national_df, months=months, scenario=scenario)
-future = forecast_df[forecast_df["period"].eq("Forecast")]
-security = calculate_security_index(filtered, forecast_df)
-security_breakdown = security_index_breakdown(filtered, forecast_df)
-peaks = peak_demand_summary(forecast_df)
+latest = national_df.sort_values("year").iloc[-1]
+baseline_scenario = "Normal year"
+baseline_months = 18
+baseline_forecast = forecast_demand(national_df, months=baseline_months, scenario=baseline_scenario)
+baseline_peaks = peak_demand_summary(baseline_forecast)
+security = calculate_security_index(national_df, baseline_forecast)
+security_breakdown = security_index_breakdown(national_df, baseline_forecast)
 regional_risk = regional_risk_ranking(regional_df)
-time_df, changes = time_intelligence(filtered)
+time_df, changes = time_intelligence(national_df)
 changes_summary = year_over_year_summary(changes)
-rules = evaluate_policy_rules(filtered, security)
+rules = evaluate_policy_rules(national_df, security)
 briefing = situation_briefing(security, rules, changes)
-actions = recommended_actions(filtered, regional_risk, rules, peaks, security)
-summary_text = executive_summary(filtered, forecast_df, scenario, security)
-scenario_forecast_outputs = {
-    name: forecast_demand(national_df, months=months, scenario=name)
+actions = recommended_actions(national_df, regional_risk, rules, baseline_peaks, security)
+summary_text = executive_summary(national_df, baseline_forecast, baseline_scenario, security)
+baseline_scenario_outputs = {
+    name: forecast_demand(national_df, months=baseline_months, scenario=name)
     for name in SCENARIOS
 }
-scenario_forecasts = pd.concat(
-    [forecast.query("period == 'Forecast'") for forecast in scenario_forecast_outputs.values()],
-    ignore_index=True,
-)
-scenario_impacts, scenario_impact_summary = scenario_impact_analysis(filtered, scenario_forecast_outputs)
+scenario_impacts, scenario_impact_summary = scenario_impact_analysis(national_df, baseline_scenario_outputs)
 
 st.title("Kyrgyzstan Energy Intelligence Dashboard")
 st.markdown(
@@ -276,6 +266,15 @@ elif dashboard_section == "National Monitoring":
         '<p class="section-note">Compare production, consumption, hydropower reliance, the domestic production gap, and the net balance after electricity trade.</p>',
         unsafe_allow_html=True,
     )
+    year_min = int(national_df["year"].min())
+    year_max = int(national_df["year"].max())
+    selected_years = st.slider(
+        "Years shown",
+        year_min,
+        year_max,
+        (max(year_min, year_max - 12), year_max),
+    )
+    filtered = national_df[national_df["year"].between(selected_years[0], selected_years[1])].copy()
     left, right = st.columns([1.35, 1])
     left.plotly_chart(line_chart(filtered), width="stretch")
     right.plotly_chart(balance_chart(filtered), width="stretch")
@@ -412,6 +411,24 @@ elif dashboard_section == "Scenario Planning":
         '<p class="section-note">Forecasts include confidence bands and scenario spread so planning decisions are not treated as certain. Monthly patterns are estimated from annual data and should be recalibrated with official monthly demand, reservoir, weather, and plant availability data.</p>',
         unsafe_allow_html=True,
     )
+    control_left, control_right = st.columns(2)
+    scenario = control_left.selectbox("Forecast Scenario", list(SCENARIOS.keys()), index=0)
+    months = control_right.slider("Forecast Horizon (months)", 6, 36, 18, step=6)
+    forecast_df = forecast_demand(national_df, months=months, scenario=scenario)
+    future = forecast_df[forecast_df["period"].eq("Forecast")]
+    peaks = peak_demand_summary(forecast_df)
+    scenario_forecast_outputs = {
+        name: forecast_demand(national_df, months=months, scenario=name)
+        for name in SCENARIOS
+    }
+    scenario_forecasts = pd.concat(
+        [forecast.query("period == 'Forecast'") for forecast in scenario_forecast_outputs.values()],
+        ignore_index=True,
+    )
+    scenario_impacts, scenario_impact_summary = scenario_impact_analysis(
+        national_df,
+        scenario_forecast_outputs,
+    )
     peak_cols = st.columns(3)
     peak_cols[0].metric("Winter peak demand", f"{peaks['winter_peak_twh']:.2f} TWh")
     peak_cols[1].metric("Summer peak demand", f"{peaks['summer_peak_twh']:.2f} TWh")
@@ -528,7 +545,7 @@ elif dashboard_section == "Methodology":
     st.markdown("### Key assumptions")
     st.markdown(
         """
-        - The latest selected year represents the current national planning position.
+        - The latest available year represents the current national planning position.
         - Current annual production is used when estimating the forecast reserve margin.
         - Hydropower availability is represented by scenario multipliers rather than observed reservoir or inflow data.
         - Policy rules and recommended actions are simplified, auditable planning prompts.
@@ -581,7 +598,7 @@ elif dashboard_section == "Data & Handoff":
     )
     st.download_button(
         "Download current national dataset",
-        filtered.to_csv(index=False).encode("utf-8"),
+        national_df.to_csv(index=False).encode("utf-8"),
         file_name="kyrgyzstan_energy_national.csv",
         mime="text/csv",
     )
