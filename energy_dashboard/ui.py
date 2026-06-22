@@ -13,6 +13,8 @@ PALETTE = {
     "amber": "#b7791f",
     "red": "#b42318",
     "green": "#15803d",
+    "violet": "#7c3aed",
+    "cyan": "#0891b2",
     "panel": "#f6f8fb",
 }
 
@@ -85,13 +87,13 @@ def line_chart(national: pd.DataFrame) -> go.Figure:
 
 
 def balance_chart(national: pd.DataFrame) -> go.Figure:
-    colors = [PALETTE["green"] if value >= 0 else PALETTE["red"] for value in national["surplus_deficit_twh"]]
+    colors = [PALETTE["green"] if value >= 0 else PALETTE["red"] for value in national["domestic_gap_twh"]]
     fig = go.Figure(
         go.Bar(
             x=national["year"],
-            y=national["surplus_deficit_twh"],
+            y=national["domestic_gap_twh"],
             marker_color=colors,
-            name="Surplus / deficit",
+            name="Domestic production gap",
         )
     )
     fig.add_hline(y=0, line_color="#94a3b8", line_width=1)
@@ -100,21 +102,33 @@ def balance_chart(national: pd.DataFrame) -> go.Figure:
         height=320,
         yaxis_title="TWh",
         xaxis_title="Year",
+        title="Domestic production gap before imports",
         showlegend=False,
     )
     return fig
 
 
 def generation_mix_chart(national: pd.DataFrame) -> go.Figure:
-    mix = national[["year", "hydro_twh", "thermal_twh"]].melt("year", var_name="source", value_name="twh")
-    labels = {"hydro_twh": "Hydropower", "thermal_twh": "Thermal"}
+    mix_columns = [column for column in ["hydro_twh", "thermal_twh", "solar_twh", "wind_twh"] if column in national]
+    mix = national[["year", *mix_columns]].melt("year", var_name="source", value_name="twh")
+    labels = {
+        "hydro_twh": "Hydropower",
+        "thermal_twh": "Fossil / thermal",
+        "solar_twh": "Solar",
+        "wind_twh": "Wind",
+    }
     mix["source"] = mix["source"].map(labels)
     fig = px.area(
         mix,
         x="year",
         y="twh",
         color="source",
-        color_discrete_map={"Hydropower": PALETTE["teal"], "Thermal": PALETTE["amber"]},
+        color_discrete_map={
+            "Hydropower": PALETTE["teal"],
+            "Fossil / thermal": PALETTE["amber"],
+            "Solar": PALETTE["cyan"],
+            "Wind": PALETTE["violet"],
+        },
     )
     fig.update_layout(
         margin=dict(l=20, r=20, t=30, b=20),
@@ -122,6 +136,130 @@ def generation_mix_chart(national: pd.DataFrame) -> go.Figure:
         yaxis_title="TWh",
         xaxis_title="Year",
         legend_title_text="",
+    )
+    return fig
+
+
+def energy_mix_share_chart(national: pd.DataFrame) -> go.Figure:
+    mix_columns = [column for column in ["hydro_twh", "thermal_twh", "solar_twh", "wind_twh"] if column in national]
+    mix = national[["year", *mix_columns]].copy()
+    total = mix[mix_columns].sum(axis=1).replace(0, pd.NA)
+    for column in mix_columns:
+        mix[column] = mix[column] / total * 100
+    mix = mix.melt("year", var_name="source", value_name="share")
+    labels = {
+        "hydro_twh": "Hydropower",
+        "thermal_twh": "Fossil / thermal",
+        "solar_twh": "Solar",
+        "wind_twh": "Wind",
+    }
+    mix["source"] = mix["source"].map(labels)
+    fig = px.bar(
+        mix,
+        x="year",
+        y="share",
+        color="source",
+        color_discrete_map={
+            "Hydropower": PALETTE["teal"],
+            "Fossil / thermal": PALETTE["amber"],
+            "Solar": PALETTE["cyan"],
+            "Wind": PALETTE["violet"],
+        },
+    )
+    fig.update_layout(
+        barmode="stack",
+        margin=dict(l=20, r=20, t=30, b=20),
+        height=340,
+        yaxis_title="Generation mix, %",
+        xaxis_title="Year",
+        legend_title_text="",
+    )
+    return fig
+
+
+def trade_chart(national: pd.DataFrame) -> go.Figure:
+    fig = go.Figure()
+    fig.add_trace(
+        go.Bar(
+            x=national["year"],
+            y=national["imports_twh"],
+            name="Imports",
+            marker_color=PALETTE["blue"],
+        )
+    )
+    fig.add_trace(
+        go.Bar(
+            x=national["year"],
+            y=-national["exports_twh"],
+            name="Exports",
+            marker_color=PALETTE["green"],
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=national["year"],
+            y=national["imports_twh"] - national["exports_twh"],
+            name="Net imports",
+            mode="lines+markers",
+            line=dict(color=PALETTE["ink"], width=3),
+        )
+    )
+    fig.add_hline(y=0, line_color="#94a3b8", line_width=1)
+    fig.update_layout(
+        barmode="relative",
+        margin=dict(l=20, r=20, t=30, b=20),
+        height=340,
+        yaxis_title="TWh",
+        xaxis_title="Year",
+        title="Electricity trade and independence trend",
+        legend_title_text="",
+        hovermode="x unified",
+    )
+    return fig
+
+
+def security_gauge(score: float, label: str) -> go.Figure:
+    fig = go.Figure(
+        go.Indicator(
+            mode="gauge+number",
+            value=score,
+            number={"suffix": "/100"},
+            title={"text": label},
+            gauge={
+                "axis": {"range": [0, 100]},
+                "bar": {"color": PALETTE["ink"]},
+                "steps": [
+                    {"range": [0, 50], "color": "#fee2e2"},
+                    {"range": [50, 75], "color": "#fef3c7"},
+                    {"range": [75, 100], "color": "#dcfce7"},
+                ],
+                "threshold": {"line": {"color": PALETTE["red"], "width": 3}, "value": 50},
+            },
+        )
+    )
+    fig.update_layout(margin=dict(l=20, r=20, t=30, b=20), height=260)
+    return fig
+
+
+def regional_risk_chart(regional_risk: pd.DataFrame) -> go.Figure:
+    colors = {"High": PALETTE["red"], "Medium": PALETTE["amber"], "Low": PALETTE["green"]}
+    ordered = regional_risk.sort_values("risk_score", ascending=True)
+    fig = go.Figure(
+        go.Bar(
+            y=ordered["region"],
+            x=ordered["risk_score"],
+            orientation="h",
+            marker_color=ordered["risk"].map(colors),
+            text=ordered["risk"],
+            textposition="inside",
+        )
+    )
+    fig.update_layout(
+        margin=dict(l=20, r=20, t=30, b=20),
+        height=380,
+        xaxis_title="Risk score",
+        yaxis_title="",
+        showlegend=False,
     )
     return fig
 
