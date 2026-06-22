@@ -7,7 +7,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import cm
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 
 def build_ministry_briefing_pdf(
@@ -17,6 +17,8 @@ def build_ministry_briefing_pdf(
     summary: str,
     actions: pd.DataFrame,
     rules: pd.DataFrame,
+    scenario_impacts: pd.DataFrame,
+    scenario_impact_summary: str,
 ) -> bytes:
     buffer = BytesIO()
     doc = SimpleDocTemplate(
@@ -57,17 +59,58 @@ def build_ministry_briefing_pdf(
         )
     )
 
+    scenario_rows = [
+        ["Scenario", "Forecast demand", "Security index", "Risk level", "Net balance", "Key concern"]
+    ]
+    for _, row in scenario_impacts.iterrows():
+        scenario_rows.append(
+            [
+                row["Scenario"],
+                row["Forecast demand"],
+                row["Security Index"],
+                row["Risk level"],
+                row["Net balance estimate"],
+                row["Key concern"],
+            ]
+        )
+    story.extend(
+        [
+            Spacer(1, 0.3 * cm),
+            KeepTogether(
+                [
+                    Paragraph("Scenario Impact Analysis", styles["Heading2"]),
+                    _styled_table(
+                        scenario_rows,
+                        [2.0 * cm, 2.3 * cm, 1.9 * cm, 2.1 * cm, 2.3 * cm, 4.9 * cm],
+                        small=True,
+                    ),
+                    Spacer(1, 0.15 * cm),
+                    Paragraph(scenario_impact_summary, styles["BodyText"]),
+                ]
+            ),
+        ]
+    )
+
     story.extend([Spacer(1, 0.3 * cm), Paragraph("Recommended Actions", styles["Heading2"])])
     action_rows = [["Priority", "Action", "Reason"]]
     for _, row in actions.head(4).iterrows():
         action_rows.append([row["Priority"], row["Recommended action"], row["Reason"]])
     story.append(_styled_table(action_rows, [2.2 * cm, 6.6 * cm, 6.7 * cm], small=True))
 
-    story.extend([Spacer(1, 0.3 * cm), Paragraph("Policy Rule Checks", styles["Heading2"])])
     rule_rows = [["Rule", "Current", "Status"]]
     for _, row in rules.iterrows():
         rule_rows.append([row["Policy rule"], row["Current value"], row["Status"]])
-    story.append(_styled_table(rule_rows, [7 * cm, 4 * cm, 4.5 * cm], small=True))
+    story.extend(
+        [
+            Spacer(1, 0.3 * cm),
+            KeepTogether(
+                [
+                    Paragraph("Policy Rule Checks", styles["Heading2"]),
+                    _styled_table(rule_rows, [7 * cm, 4 * cm, 4.5 * cm], small=True),
+                ]
+            ),
+        ]
+    )
 
     doc.build(story)
     return buffer.getvalue()

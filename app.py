@@ -188,7 +188,16 @@ with st.expander("Definitions"):
         """
     )
 
-briefing_pdf = build_ministry_briefing_pdf(latest, security, briefing, summary_text, actions, rules)
+briefing_pdf = build_ministry_briefing_pdf(
+    latest,
+    security,
+    briefing,
+    summary_text,
+    actions,
+    rules,
+    scenario_impacts,
+    scenario_impact_summary,
+)
 st.download_button(
     "Download Executive Energy Briefing",
     briefing_pdf,
