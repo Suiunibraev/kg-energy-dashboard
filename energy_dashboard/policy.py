@@ -311,6 +311,64 @@ def executive_summary(national: pd.DataFrame, forecast: pd.DataFrame, scenario: 
     )
 
 
+def scenario_impact_analysis(
+    national: pd.DataFrame,
+    scenario_forecasts: dict[str, pd.DataFrame],
+) -> tuple[pd.DataFrame, str]:
+    """Compare existing scenario outputs without changing forecast or index formulas."""
+    latest = national.sort_values("year").iloc[-1]
+    non_hydro_production = (
+        float(latest["production_twh"])
+        - float(latest.get("hydro_twh", 0))
+    )
+    net_trade = float(latest.get("imports_twh", 0)) - float(latest.get("exports_twh", 0))
+    rows = []
+
+    for scenario_name in ["Dry year", "Normal year", "Wet year"]:
+        forecast = scenario_forecasts[scenario_name]
+        future = forecast[forecast["period"].eq("Forecast")].head(12)
+        forecast_demand = float(future["forecast_twh"].sum())
+        hydro_index = float(future["hydro_availability_index"].iloc[0])
+        period_fraction = len(future) / 12
+        estimated_supply = (
+            non_hydro_production + float(latest.get("hydro_twh", 0)) * hydro_index
+        ) * period_fraction
+        net_balance = estimated_supply + net_trade * period_fraction - forecast_demand
+        security = calculate_security_index(national, forecast)
+
+        if hydro_index < 1:
+            key_concern = "Reduced hydropower availability"
+        elif net_balance < 0:
+            key_concern = "Estimated supply deficit"
+        elif security["label"] != "Secure":
+            key_concern = "Limited forecast reserve margin"
+        else:
+            key_concern = "Continued hydropower dependence"
+
+        rows.append(
+            {
+                "Scenario": scenario_name,
+                "Forecast demand": f"{forecast_demand:.1f} TWh",
+                "Security Index": f"{security['score']:.1f}/100",
+                "Risk level": security["label"],
+                "Net balance estimate": f"{net_balance:+.1f} TWh",
+                "Key concern": key_concern,
+            }
+        )
+
+    comparison = pd.DataFrame(rows)
+    dry = comparison.loc[comparison["Scenario"].eq("Dry year")].iloc[0]
+    wet = comparison.loc[comparison["Scenario"].eq("Wet year")].iloc[0]
+    summary = (
+        f"The dry-year case is the most constrained, with a {dry['Security Index']} Security Index "
+        f"and an estimated net balance of {dry['Net balance estimate']}. "
+        f"The wet-year case improves the index to {wet['Security Index']} and the estimated balance to "
+        f"{wet['Net balance estimate']}. The main planning sensitivity is hydropower availability, "
+        "while forecast demand also changes across scenarios."
+    )
+    return comparison, summary
+
+
 def peak_demand_summary(forecast: pd.DataFrame) -> dict[str, float | pd.Timestamp]:
     future = forecast[forecast["period"].eq("Forecast")].copy()
     if future.empty:

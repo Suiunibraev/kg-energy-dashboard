@@ -12,6 +12,7 @@ from energy_dashboard.policy import (
     peak_demand_summary,
     recommended_actions,
     regional_risk_ranking,
+    scenario_impact_analysis,
     security_index_breakdown,
     situation_briefing,
     time_intelligence,
@@ -114,10 +115,15 @@ rules = evaluate_policy_rules(filtered, security)
 briefing = situation_briefing(security, rules, changes)
 actions = recommended_actions(filtered, regional_risk, rules, peaks, security)
 summary_text = executive_summary(filtered, forecast_df, scenario, security)
+scenario_forecast_outputs = {
+    name: forecast_demand(national_df, months=months, scenario=name)
+    for name in SCENARIOS
+}
 scenario_forecasts = pd.concat(
-    [forecast_demand(national_df, months=months, scenario=name).query("period == 'Forecast'") for name in SCENARIOS],
+    [forecast.query("period == 'Forecast'") for forecast in scenario_forecast_outputs.values()],
     ignore_index=True,
 )
+scenario_impacts, scenario_impact_summary = scenario_impact_analysis(filtered, scenario_forecast_outputs)
 
 st.title("Kyrgyzstan Energy Intelligence Dashboard")
 st.markdown(
@@ -323,6 +329,15 @@ with tabs[4]:
     peak_cols[2].metric("Forecast demand", f"{future['forecast_twh'].sum():.1f} TWh")
     st.plotly_chart(forecast_chart(forecast_df), width="stretch")
     st.plotly_chart(scenario_spread_chart(scenario_forecasts), width="stretch")
+
+    st.subheader("Scenario Impact Analysis")
+    st.caption(
+        "Side-by-side comparison uses up to the first 12 forecast months, matching the unchanged "
+        "Security Index calculation. The balance estimate prorates current generation and trade to "
+        "the comparison period and adjusts hydropower using each scenario's existing availability index."
+    )
+    st.dataframe(scenario_impacts, width="stretch", hide_index=True)
+    st.info(scenario_impact_summary)
 
     forecast_total = future["forecast_twh"].sum()
     st.info(
