@@ -219,6 +219,7 @@ tabs = st.tabs(
         "National monitoring",
         "Regional view",
         "Forecast uncertainty",
+        "Methodology",
         "Data and handoff",
     ]
 )
@@ -430,6 +431,133 @@ with tabs[4]:
         st.dataframe(future, width="stretch", hide_index=True)
 
 with tabs[5]:
+    st.subheader("Dashboard methodology and interpretation")
+    st.markdown(
+        '<p class="section-note">This page explains how the dashboard turns available data into indicators, '
+        "forecasts, risk labels, and planning prompts. The methods are transparent prototypes and should be "
+        "validated with Ministry experts before operational adoption.</p>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("### Energy Security Index")
+    st.write(
+        "The Energy Security Index is a 0–100 composite score. It adds four weighted components; "
+        "a higher score indicates stronger security under the current data and forecast assumptions."
+    )
+    methodology_index = security_breakdown[
+        ["Component", "Weight", "Current indicator", "Why it changed the score"]
+    ].rename(columns={"Why it changed the score": "Scoring interpretation"})
+    st.dataframe(methodology_index, width="stretch", hide_index=True)
+    st.code(
+        "Security Index = Production coverage score (35) + Hydropower dependency score (20)\n"
+        "               + Demand growth score (20) + Forecast reserve margin score (25)",
+        language=None,
+    )
+    st.markdown(
+        """
+        - **Production coverage:** compares current domestic production with current consumption. Full points require production equal to 105% of consumption.
+        - **Hydropower dependency:** full points apply up to a 55% hydro share; the score falls as dependence rises above that level.
+        - **Demand growth:** uses average recent annual consumption growth. Faster growth lowers the contribution.
+        - **Forecast reserve margin:** compares current annual production with demand forecast over up to the next 12 months.
+        - **Risk labels:** Secure is 75 or higher; Moderate Risk is 50–74.9; High Risk is below 50.
+        """
+    )
+    st.caption(
+        "The weights and thresholds are prototype policy assumptions. They are not an officially adopted Ministry methodology."
+    )
+
+    st.markdown("### Forecasting approach and scenarios")
+    st.write(
+        "Public national electricity data is annual. The dashboard therefore estimates monthly history using "
+        "winter demand weights and separate hydropower seasonality weights. It then applies Holt-Winters "
+        "exponential smoothing with an additive trend, multiplicative seasonality, and a 12-month seasonal cycle."
+    )
+    scenario_methodology = pd.DataFrame(
+        [
+            [
+                name,
+                f"{parameters['demand_multiplier']:.2f}",
+                f"{parameters['hydro_multiplier']:.2f}",
+            ]
+            for name, parameters in SCENARIOS.items()
+        ],
+        columns=["Scenario", "Demand multiplier", "Hydropower availability index"],
+    )
+    st.dataframe(scenario_methodology, width="stretch", hide_index=True)
+    st.markdown(
+        """
+        - If the statistical model cannot be fitted, the dashboard uses a seasonal average with a simple trend.
+        - Confidence bands use forecast residual variation and are planning ranges, not guaranteed limits.
+        - Scenario Impact Analysis uses the same forecast outputs and unchanged Security Index calculation.
+        - Monthly forecasts should be recalibrated when observed monthly demand, reservoir, weather, outage, and plant-availability data become available.
+        """
+    )
+
+    st.markdown("### Data sources and fallback behavior")
+    st.markdown(
+        """
+        - **Our World in Data:** available annual national electricity generation, demand, hydropower, thermal generation, trade, and population fields.
+        - **World Bank:** electricity access and population indicators where available.
+        - **National Statistical Committee:** official regional population estimates used in the regional planning layer.
+        - **Packaged fallback:** if national public endpoints fail, starter national data keeps the application usable.
+        - **Regional starter file:** packaged electricity production, consumption, and loss values support demonstration and workflow design only.
+        """
+    )
+    st.info(
+        "The sidebar reports whether national sources are live or fallback. “Loaded at” is the request time, "
+        "not the source provider’s publication or revision date."
+    )
+
+    st.markdown("### Regional data limitations")
+    st.markdown(
+        """
+        - Regional population is classified as **Official**.
+        - Regional electricity production, consumption, losses, balance, and risk ranking are **Demonstration**.
+        - Demand per capita and regional demand share are **Estimated** because they use demonstration demand.
+        - Starter regional demand is not reconciled to the national electricity total.
+        - Regional risk rankings should not determine funding or infrastructure priorities until official Ministry data replaces the starter values.
+        """
+    )
+
+    st.markdown("### Key assumptions")
+    st.markdown(
+        """
+        - The latest selected year represents the current national planning position.
+        - Current annual production is used when estimating the forecast reserve margin.
+        - Hydropower availability is represented by scenario multipliers rather than observed reservoir or inflow data.
+        - Policy rules and recommended actions are simplified, auditable planning prompts.
+        - Public annual data is sufficient for strategic demonstration, but not for real-time system operation.
+        """
+    )
+
+    use_col, limit_col = st.columns(2)
+    with use_col:
+        st.markdown("### Appropriate uses")
+        st.markdown(
+            """
+            - Strategic monitoring and policy discussion
+            - Comparing transparent planning scenarios
+            - Identifying questions for further analysis
+            - Preparing executive briefings and meetings
+            - Designing Ministry data-integration requirements
+            """
+        )
+    with limit_col:
+        st.markdown("### Do not use for")
+        st.markdown(
+            """
+            - Real-time dispatch or grid operation
+            - Binding procurement or import commitments
+            - Budget or investment approval
+            - Official regional performance assessment
+            - Decisions requiring validated operational forecasts
+            """
+        )
+    st.warning(
+        "Interpret scores, forecasts, regional rankings, and recommended actions as decision-support signals—not final decisions."
+    )
+
+with tabs[6]:
     st.subheader("Data sources and implementation notes")
     source_html = "".join(
         f'<span class="source-pill">{status.name}: {"live" if status.status == "live" else "fallback"}'
