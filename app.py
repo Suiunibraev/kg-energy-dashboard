@@ -100,6 +100,7 @@ dashboard_section = st.sidebar.radio(
     "Choose a section",
     [
         "Executive Overview",
+        "Energy Security Assessment",
         "Policy Rules",
         "National Monitoring",
         "Regional Planning",
@@ -142,64 +143,6 @@ st.markdown(
     "For policymakers and energy planners: monitor Kyrgyzstan's electricity security, seasonal demand risk, imports, regional deficits, and forecast uncertainty."
 )
 
-st.markdown(
-    f"""
-    <div class="briefing-panel">
-        <div class="briefing-grid">
-            <div class="briefing-item">
-                <div class="briefing-label">Today's energy status</div>
-                <div class="briefing-value">{briefing["status"]}</div>
-            </div>
-            <div class="briefing-item">
-                <div class="briefing-label">Main driver</div>
-                <div class="briefing-value">{briefing["main_driver"]}</div>
-            </div>
-            <div class="briefing-item">
-                <div class="briefing-label">Key concern</div>
-                <div class="briefing-value">{briefing["key_concern"]}</div>
-            </div>
-            <div class="briefing-item">
-                <div class="briefing-label">Outlook</div>
-                <div class="briefing-value">{briefing["outlook"]}</div>
-            </div>
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-metric_cols = st.columns(6)
-metric_cols[0].metric("Total production", f"{latest['production_twh']:.1f} TWh")
-metric_cols[1].metric("Total consumption", f"{latest['consumption_twh']:.1f} TWh")
-metric_cols[2].metric("Surplus / deficit before trade", f"{latest['domestic_gap_twh']:.1f} TWh")
-metric_cols[3].metric("Balance after imports / exports", f"{latest['net_balance_twh']:.2f} TWh")
-metric_cols[4].metric("Net imports", f"{latest['net_imports_twh']:.1f} TWh")
-metric_cols[5].metric("Security index", f"{security['score']:.1f}/100", security["label"])
-metric_cols[2].caption("Production minus consumption before imports and exports.")
-metric_cols[5].caption("Composite 0-100 score based on balance, dependency, growth, and reserve margin.")
-
-st.info(summary_text)
-st.markdown(
-    f"""
-    - Current national risk: **{briefing["status"]}**
-    - Main cause of risk: **{briefing["main_driver"]}**
-    - Recommended next action: **{actions.iloc[0]["Recommended action"] if not actions.empty else "Continue monitoring system indicators."}**
-    """
-)
-
-with st.expander("Definitions"):
-    st.markdown(
-        """
-        - **Domestic gap:** domestic electricity production minus consumption before imports and exports.
-        - **Net balance:** production plus imports minus consumption and exports.
-        - **Net imports:** imports minus exports; higher values indicate stronger import dependence.
-        - **Security index:** 0-100 score based on production coverage, hydropower dependency, demand growth, and forecast reserve margin.
-        - **Reserve margin:** estimated supply cushion relative to forecast demand.
-        - **Hydro vulnerability:** risk flag when the generation mix depends heavily on hydropower.
-        - **Scenario spread:** difference between dry, normal, and wet hydropower demand scenarios.
-        """
-    )
-
 briefing_pdf = build_ministry_briefing_pdf(
     latest,
     security,
@@ -213,35 +156,122 @@ briefing_pdf = build_ministry_briefing_pdf(
     changes,
     changes_summary,
 )
-st.download_button(
-    "Download Executive Energy Briefing",
-    briefing_pdf,
-    file_name="kyrgyzstan_energy_situation_briefing.pdf",
-    mime="application/pdf",
-)
 
 if dashboard_section == "Executive Overview":
-    st.subheader("Energy security overview")
-    left, right = st.columns([0.9, 1.4])
-    left.plotly_chart(security_gauge(security["score"], security["label"]), width="stretch")
-    right.subheader("Recommended actions")
-    right.dataframe(actions, width="stretch", hide_index=True)
+    st.subheader("Current electricity situation")
+    st.markdown(
+        '<p class="section-note">Latest available factual national electricity indicators. '
+        "This page does not include forecast-driven scores or recommendations.</p>",
+        unsafe_allow_html=True,
+    )
+    metric_cols = st.columns(5)
+    metric_cols[0].metric("Production", f"{latest['production_twh']:.1f} TWh")
+    metric_cols[1].metric("Consumption", f"{latest['consumption_twh']:.1f} TWh")
+    metric_cols[2].metric("Domestic deficit", f"{latest['domestic_gap_twh']:.1f} TWh")
+    metric_cols[3].metric("Net imports", f"{latest['net_imports_twh']:.1f} TWh")
+    metric_cols[4].metric("Balance after trade", f"{latest['net_balance_twh']:.2f} TWh")
+
+    st.subheader("How to read these indicators")
+    overview_explanations = pd.DataFrame(
+        [
+            [
+                "Production",
+                "Electricity generated domestically during the latest year.",
+                "Shows the scale of domestic supply available to meet demand.",
+            ],
+            [
+                "Consumption",
+                "Total national electricity demand or final consumption.",
+                "Shows how much electricity the system needs to serve.",
+            ],
+            [
+                "Domestic deficit",
+                "Production minus consumption before imports and exports.",
+                "A negative value shows how much demand is not covered by domestic generation alone.",
+            ],
+            [
+                "Net imports",
+                "Electricity imports minus electricity exports.",
+                "Shows how much the national balance relies on electricity trade.",
+            ],
+            [
+                "Balance after trade",
+                "Production plus imports minus consumption and exports.",
+                "Shows whether recorded supply and trade balance recorded demand.",
+            ],
+        ],
+        columns=["Indicator", "What it means", "Why it matters"],
+    )
+    st.dataframe(overview_explanations, width="stretch", hide_index=True)
+    st.caption(
+        f"Latest available national year: {int(latest['year'])}. "
+        "Values reflect the currently loaded public or fallback national dataset."
+    )
+
+elif dashboard_section == "Energy Security Assessment":
+    st.subheader("Energy Security Assessment")
+    st.markdown(
+        '<p class="section-note">Forecast-informed assessment using the existing Normal-year baseline and '
+        "unchanged Energy Security Index methodology.</p>",
+        unsafe_allow_html=True,
+    )
+    assessment_cols = st.columns([0.9, 1.4])
+    assessment_cols[0].plotly_chart(
+        security_gauge(security["score"], security["label"]),
+        width="stretch",
+    )
+    assessment_cols[1].metric(
+        "Security Index",
+        f"{security['score']:.1f}/100",
+        security["label"],
+    )
+    assessment_cols[1].caption(
+        "Risk level is derived from the unchanged Security Index bands: Secure, Moderate Risk, or High Risk."
+    )
+
+    st.markdown(
+        f"""
+        <div class="briefing-panel">
+            <div class="briefing-grid">
+                <div class="briefing-item">
+                    <div class="briefing-label">Risk level</div>
+                    <div class="briefing-value">{briefing["status"]}</div>
+                </div>
+                <div class="briefing-item">
+                    <div class="briefing-label">Main driver</div>
+                    <div class="briefing-value">{briefing["main_driver"]}</div>
+                </div>
+                <div class="briefing-item">
+                    <div class="briefing-label">Key concern</div>
+                    <div class="briefing-value">{briefing["key_concern"]}</div>
+                </div>
+                <div class="briefing-item">
+                    <div class="briefing-label">Outlook</div>
+                    <div class="briefing-value">{briefing["outlook"]}</div>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     st.subheader("How the Security Index is calculated")
     st.caption(
         "The final score is the sum of four weighted contributions. Higher component scores indicate stronger energy security."
     )
     breakdown_cols = st.columns(4)
     for column, (_, component) in zip(breakdown_cols, security_breakdown.iterrows()):
-        column.metric(
-            component["Component"],
-            component["Contribution"],
-        )
+        column.metric(component["Component"], component["Contribution"])
         column.caption(f"Weight: {component['Weight']} · {component['Current indicator']}")
         column.write(component["Why it changed the score"])
     st.caption(
         f"Total: {security['score']:.1f}/100 = "
         + " + ".join(security_breakdown["Contribution"].str.split(" / ").str[0])
     )
+
+    st.subheader("Recommended actions and evidence")
+    st.dataframe(actions, width="stretch", hide_index=True)
+
     st.subheader("What Changed Since Last Year?")
     change_cols = st.columns(5)
     change_cols[0].metric("Demand YoY", f"{changes['demand_yoy_pct']:.1f}%")
@@ -250,6 +280,13 @@ if dashboard_section == "Executive Overview":
     change_cols[3].metric("Hydro share change", f"{changes['hydro_share_change_pct']:.1f} pp")
     change_cols[4].metric("Domestic gap change", f"{changes['domestic_gap_change_twh']:+.1f} TWh")
     st.info(changes_summary)
+
+    st.download_button(
+        "Download Executive Energy Briefing",
+        briefing_pdf,
+        file_name="kyrgyzstan_energy_situation_briefing.pdf",
+        mime="application/pdf",
+    )
 
 elif dashboard_section == "Policy Rules":
     st.subheader("Policy rules and audit trail")
