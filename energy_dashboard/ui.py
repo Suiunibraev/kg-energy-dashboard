@@ -25,14 +25,48 @@ def apply_theme() -> None:
     st.markdown(
         """
         <style>
-        .stApp { background: #f8fafc; color: #1f2933; }
-        [data-testid="stSidebar"] { background: #edf2f7; }
+        .stApp { background: #f7f9fc; color: #1f2933; }
+        .block-container { padding-top: 2rem; padding-bottom: 2.5rem; }
+        [data-testid="stSidebar"] { background: #eef3f8; border-right: 1px solid #d9e2ec; }
+        h1, h2, h3 { letter-spacing: 0; color: #17212b; }
         div[data-testid="stMetric"] {
             background: #ffffff;
             border: 1px solid #d9e2ec;
             border-radius: 8px;
-            padding: 14px 16px;
-            box-shadow: 0 1px 2px rgba(31, 41, 51, 0.04);
+            padding: 12px 14px;
+            box-shadow: 0 1px 2px rgba(31, 41, 51, 0.05);
+        }
+        div[data-testid="stMetric"] label { color: #52606d; }
+        .briefing-panel {
+            background: #ffffff;
+            border: 1px solid #d9e2ec;
+            border-radius: 8px;
+            padding: 18px 20px;
+            margin: 14px 0 18px;
+            box-shadow: 0 1px 3px rgba(31, 41, 51, 0.05);
+        }
+        .briefing-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+        }
+        .briefing-item {
+            border-left: 3px solid #2563eb;
+            padding-left: 10px;
+            min-height: 66px;
+        }
+        .briefing-label {
+            color: #52606d;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+        .briefing-value {
+            color: #17212b;
+            font-size: 1rem;
+            line-height: 1.35;
+            margin-top: 4px;
+            font-weight: 650;
         }
         .section-note {
             color: #52606d;
@@ -48,6 +82,9 @@ def apply_theme() -> None:
             background: #fff;
             color: #334155;
             font-size: 0.82rem;
+        }
+        @media (max-width: 900px) {
+            .briefing-grid { grid-template-columns: 1fr; }
         }
         </style>
         """,
@@ -212,6 +249,72 @@ def trade_chart(national: pd.DataFrame) -> go.Figure:
         yaxis_title="TWh",
         xaxis_title="Year",
         title="Electricity trade and independence trend",
+        legend_title_text="",
+        hovermode="x unified",
+    )
+    return fig
+
+
+def time_intelligence_chart(national: pd.DataFrame) -> go.Figure:
+    fig = go.Figure()
+    fig.add_trace(
+        go.Bar(
+            x=national["year"],
+            y=national["demand_yoy_pct"],
+            name="Demand YoY",
+            marker_color=PALETTE["blue"],
+        )
+    )
+    fig.add_trace(
+        go.Bar(
+            x=national["year"],
+            y=national["production_yoy_pct"],
+            name="Production YoY",
+            marker_color=PALETTE["teal"],
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=national["year"],
+            y=national["seasonal_deviation_index"],
+            name="Deviation from 3-year demand trend",
+            mode="lines+markers",
+            line=dict(color=PALETTE["ink"], width=3),
+        )
+    )
+    fig.add_hline(y=0, line_color="#94a3b8", line_width=1)
+    fig.update_layout(
+        barmode="group",
+        margin=dict(l=20, r=20, t=30, b=20),
+        height=360,
+        yaxis_title="Percent",
+        xaxis_title="Year",
+        title="Year-on-year change and trend deviation",
+        legend_title_text="",
+        hovermode="x unified",
+    )
+    return fig
+
+
+def scenario_spread_chart(scenarios: pd.DataFrame) -> go.Figure:
+    fig = px.line(
+        scenarios,
+        x="date",
+        y="forecast_twh",
+        color="scenario",
+        color_discrete_map={
+            "Dry year": PALETTE["red"],
+            "Normal year": PALETTE["blue"],
+            "Wet year": PALETTE["teal"],
+        },
+    )
+    fig.update_traces(line=dict(width=3))
+    fig.update_layout(
+        margin=dict(l=20, r=20, t=30, b=20),
+        height=360,
+        yaxis_title="Monthly demand, TWh",
+        xaxis_title="",
+        title="Scenario spread",
         legend_title_text="",
         hovermode="x unified",
     )

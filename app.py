@@ -8,9 +8,14 @@ from energy_dashboard.forecasting import SCENARIOS, forecast_demand
 from energy_dashboard.policy import (
     calculate_security_index,
     executive_summary,
+    evaluate_policy_rules,
     peak_demand_summary,
+    recommended_actions,
     regional_risk_ranking,
+    situation_briefing,
+    time_intelligence,
 )
+from energy_dashboard.reporting import build_ministry_briefing_pdf
 from energy_dashboard.ui import (
     apply_theme,
     balance_chart,
@@ -20,7 +25,9 @@ from energy_dashboard.ui import (
     line_chart,
     regional_bar_chart,
     regional_risk_chart,
+    scenario_spread_chart,
     security_gauge,
+    time_intelligence_chart,
     trade_chart,
 )
 
@@ -85,10 +92,43 @@ future = forecast_df[forecast_df["period"].eq("Forecast")]
 security = calculate_security_index(filtered, forecast_df)
 peaks = peak_demand_summary(forecast_df)
 regional_risk = regional_risk_ranking(regional_df)
+time_df, changes = time_intelligence(filtered)
+rules = evaluate_policy_rules(filtered, security)
+briefing = situation_briefing(security, rules, changes)
+actions = recommended_actions(filtered, regional_risk, rules, peaks, security)
+summary_text = executive_summary(filtered, forecast_df, scenario, security)
+scenario_forecasts = pd.concat(
+    [forecast_demand(national_df, months=months, scenario=name).query("period == 'Forecast'") for name in SCENARIOS],
+    ignore_index=True,
+)
 
 st.title("Kyrgyzstan Energy Intelligence Dashboard")
+st.markdown("Decision-support dashboard for electricity security, seasonal risk, and regional planning.")
+
 st.markdown(
-    "A Ministry-ready monitoring and forecasting tool for electricity production, consumption, regional demand, and seasonal planning."
+    f"""
+    <div class="briefing-panel">
+        <div class="briefing-grid">
+            <div class="briefing-item">
+                <div class="briefing-label">Today's energy status</div>
+                <div class="briefing-value">{briefing["status"]}</div>
+            </div>
+            <div class="briefing-item">
+                <div class="briefing-label">Main driver</div>
+                <div class="briefing-value">{briefing["main_driver"]}</div>
+            </div>
+            <div class="briefing-item">
+                <div class="briefing-label">Key concern</div>
+                <div class="briefing-value">{briefing["key_concern"]}</div>
+            </div>
+            <div class="briefing-item">
+                <div class="briefing-label">Outlook</div>
+                <div class="briefing-value">{briefing["outlook"]}</div>
+            </div>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
 
 metric_cols = st.columns(6)
@@ -99,31 +139,51 @@ metric_cols[3].metric("Balance after imports / exports", f"{latest['net_balance_
 metric_cols[4].metric("Net imports", f"{latest['net_imports_twh']:.1f} TWh")
 metric_cols[5].metric("Security index", f"{security['score']:.1f}/100", security["label"])
 
-st.info(executive_summary(filtered, forecast_df, scenario, security))
+st.info(summary_text)
 
-tabs = st.tabs(["Policy overview", "National monitoring", "Regional view", "Seasonal forecast", "Data and handoff"])
+briefing_pdf = build_ministry_briefing_pdf(latest, security, briefing, summary_text, actions, rules)
+st.download_button(
+    "Generate Ministry Briefing (PDF)",
+    briefing_pdf,
+    file_name="kyrgyzstan_energy_situation_briefing.pdf",
+    mime="application/pdf",
+)
+
+tabs = st.tabs(
+    [
+        "Situation briefing",
+        "Policy rules",
+        "National monitoring",
+        "Regional view",
+        "Forecast uncertainty",
+        "Data and handoff",
+    ]
+)
 
 with tabs[0]:
     st.subheader("Energy security overview")
     left, right = st.columns([0.9, 1.4])
     left.plotly_chart(security_gauge(security["score"], security["label"]), width="stretch")
-    right.dataframe(
-        pd.DataFrame(
-            [
-                {"Driver": "Production coverage", "Value": f"{security['production_coverage_pct']:.1f}%"},
-                {"Driver": "Hydropower dependency", "Value": f"{security['hydro_share_pct']:.1f}%"},
-                {"Driver": "Recent annual demand growth", "Value": f"{security['demand_growth_pct']:.1f}%"},
-                {"Driver": "Forecast reserve margin", "Value": f"{security['reserve_margin_pct']:.1f}%"},
-                {"Driver": "Winter peak demand", "Value": f"{peaks['winter_peak_twh']:.2f} TWh"},
-                {"Driver": "Summer peak demand", "Value": f"{peaks['summer_peak_twh']:.2f} TWh"},
-            ]
-        ),
-        width="stretch",
-        hide_index=True,
-    )
-    st.plotly_chart(trade_chart(filtered), width="stretch")
+    right.subheader("Recommended actions")
+    right.dataframe(actions, width="stretch", hide_index=True)
+    st.subheader("What changed in the latest year")
+    change_cols = st.columns(5)
+    change_cols[0].metric("Demand YoY", f"{changes['demand_yoy_pct']:.1f}%")
+    change_cols[1].metric("Production YoY", f"{changes['production_yoy_pct']:.1f}%")
+    change_cols[2].metric("Net imports YoY", f"{changes['imports_yoy_pct']:.1f}%")
+    change_cols[3].metric("Hydro share change", f"{changes['hydro_share_change_pct']:.1f} pp")
+    change_cols[4].metric("Demand trend deviation", f"{changes['seasonal_deviation_index']:.1f}%")
 
 with tabs[1]:
+    st.subheader("Policy rules and audit trail")
+    st.markdown(
+        '<p class="section-note">These thresholds make the index explainable and keep risk interpretation stable over time.</p>',
+        unsafe_allow_html=True,
+    )
+    st.dataframe(rules, width="stretch", hide_index=True)
+    st.plotly_chart(time_intelligence_chart(time_df), width="stretch")
+
+with tabs[2]:
     st.subheader("National electricity trends")
     st.markdown(
         '<p class="section-note">Compare production, consumption, hydropower reliance, the domestic production gap, and the net balance after electricity trade.</p>',
@@ -135,6 +195,7 @@ with tabs[1]:
     mix_left, mix_right = st.columns(2)
     mix_left.plotly_chart(generation_mix_chart(filtered), width="stretch")
     mix_right.plotly_chart(energy_mix_share_chart(filtered), width="stretch")
+    st.plotly_chart(trade_chart(filtered), width="stretch")
 
     with st.expander("View national data table"):
         st.dataframe(
@@ -157,7 +218,7 @@ with tabs[1]:
             hide_index=True,
         )
 
-with tabs[2]:
+with tabs[3]:
     st.subheader("Regional electricity picture")
     st.markdown(
         '<p class="section-note">Regional ranking highlights where demand, deficits, and distribution losses create planning pressure.</p>',
@@ -187,10 +248,10 @@ with tabs[2]:
         hide_index=True,
     )
 
-with tabs[3]:
-    st.subheader("Seasonal demand forecast")
+with tabs[4]:
+    st.subheader("Forecast uncertainty and peak demand")
     st.markdown(
-        '<p class="section-note">Forecasts use historical seasonality and scenario adjustments. Peaks are highlighted because supply interruptions usually occur during high-load periods.</p>',
+        '<p class="section-note">Forecasts include confidence bands and scenario spread so planning decisions are not treated as certain.</p>',
         unsafe_allow_html=True,
     )
     peak_cols = st.columns(3)
@@ -198,6 +259,7 @@ with tabs[3]:
     peak_cols[1].metric("Summer peak demand", f"{peaks['summer_peak_twh']:.2f} TWh")
     peak_cols[2].metric("Forecast demand", f"{future['forecast_twh'].sum():.1f} TWh")
     st.plotly_chart(forecast_chart(forecast_df), width="stretch")
+    st.plotly_chart(scenario_spread_chart(scenario_forecasts), width="stretch")
 
     forecast_total = future["forecast_twh"].sum()
     st.info(
@@ -207,7 +269,7 @@ with tabs[3]:
     with st.expander("View forecast table"):
         st.dataframe(future, width="stretch", hide_index=True)
 
-with tabs[4]:
+with tabs[5]:
     st.subheader("Data sources and implementation notes")
     source_html = "".join(
         f'<span class="source-pill">{status.name}: {"live" if status.status == "live" else "fallback"}</span>'
