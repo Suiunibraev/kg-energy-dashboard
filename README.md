@@ -6,9 +6,26 @@ The application combines:
 
 - National electricity monitoring using public data from Our World in Data and World Bank indicators.
 - Clear separation between the domestic production gap and the net balance after imports/exports.
+- An explainable Energy Security Index with auditable policy rules and recommended actions.
+- Executive situation briefing and downloadable PDF briefing for meetings.
 - Regional comparison views with a clearly labeled starter regional dataset that can be replaced by Ministry feeds.
-- Seasonal demand forecasting with dry, normal, and wet hydropower scenarios.
+- Seasonal demand forecasting with confidence bands and dry, normal, and wet hydropower scenarios.
 - A Ministry handoff one-pager in `docs/MINISTRY_ONE_PAGER.md`.
+
+## Why This Matters
+
+Energy ministries do not only need charts. They need repeatable interpretation, clear risk triggers, and meeting-ready outputs. This dashboard frames electricity data around practical planning questions:
+
+- Is domestic production keeping pace with demand?
+- Are imports becoming more important to system balance?
+- Which regions should receive planning attention first?
+- How does winter peak demand change under dry hydropower conditions?
+- What action should be considered next?
+
+## Demo
+
+- Live Streamlit app: add your deployed Streamlit URL here.
+- Screenshots or GIFs: add images under `docs/` and link them here after deployment.
 
 ## Quick Start
 

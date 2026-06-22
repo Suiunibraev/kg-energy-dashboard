@@ -98,7 +98,7 @@ for status in source_statuses:
     label = "Live" if status.status == "live" else "Fallback"
     st.sidebar.write(f"{status.name}: {label}")
     if status.last_updated:
-        st.sidebar.caption(f"Updated {status.last_updated}")
+        st.sidebar.caption(f"Loaded at {status.last_updated}")
 
 filtered = national_df[national_df["year"].between(selected_years[0], selected_years[1])].copy()
 latest = filtered.iloc[-1]
@@ -166,6 +166,19 @@ st.markdown(
     - Recommended next action: **{actions.iloc[0]["Recommended action"] if not actions.empty else "Continue monitoring system indicators."}**
     """
 )
+
+with st.expander("Definitions"):
+    st.markdown(
+        """
+        - **Domestic gap:** domestic electricity production minus consumption before imports and exports.
+        - **Net balance:** production plus imports minus consumption and exports.
+        - **Net imports:** imports minus exports; higher values indicate stronger import dependence.
+        - **Security index:** 0-100 score based on production coverage, hydropower dependency, demand growth, and forecast reserve margin.
+        - **Reserve margin:** estimated supply cushion relative to forecast demand.
+        - **Hydro vulnerability:** risk flag when the generation mix depends heavily on hydropower.
+        - **Scenario spread:** difference between dry, normal, and wet hydropower demand scenarios.
+        """
+    )
 
 briefing_pdf = build_ministry_briefing_pdf(latest, security, briefing, summary_text, actions, rules)
 st.download_button(
@@ -251,6 +264,10 @@ with tabs[3]:
         '<p class="section-note">Regional ranking highlights where demand, deficits, and distribution losses create planning pressure.</p>',
         unsafe_allow_html=True,
     )
+    st.warning(
+        "Regional values use a transparent starter dataset for demonstration and workflow design. "
+        "Replace them with official Ministry regional feeds before operational use."
+    )
     map_df = regional_df.copy()
     map_df["marker_size"] = (map_df["consumption_gwh"] / map_df["consumption_gwh"].max() * 28 + 8).round(1)
     map_df["color"] = "#2563eb"
@@ -279,7 +296,7 @@ with tabs[3]:
 with tabs[4]:
     st.subheader("Forecast uncertainty and peak demand")
     st.markdown(
-        '<p class="section-note">Forecasts include confidence bands and scenario spread so planning decisions are not treated as certain.</p>',
+        '<p class="section-note">Forecasts include confidence bands and scenario spread so planning decisions are not treated as certain. Monthly patterns are estimated from annual data and should be recalibrated with official monthly demand, reservoir, weather, and plant availability data.</p>',
         unsafe_allow_html=True,
     )
     peak_cols = st.columns(3)
@@ -301,7 +318,7 @@ with tabs[5]:
     st.subheader("Data sources and implementation notes")
     source_html = "".join(
         f'<span class="source-pill">{status.name}: {"live" if status.status == "live" else "fallback"}'
-        f'{f" | {status.last_updated}" if status.last_updated else ""}</span>'
+        f'{f" | loaded at {status.last_updated}" if status.last_updated else ""}</span>'
         for status in source_statuses
     )
     st.markdown(source_html, unsafe_allow_html=True)

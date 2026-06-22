@@ -101,6 +101,7 @@ def line_chart(national: pd.DataFrame) -> go.Figure:
             name="Production",
             mode="lines+markers",
             line=dict(color=PALETTE["teal"], width=3),
+            hovertemplate="<b>Year:</b> %{x}<br><b>Production:</b> %{y:.2f} TWh<extra>Electricity generated domestically in Kyrgyzstan.</extra>",
         )
     )
     fig.add_trace(
@@ -110,6 +111,7 @@ def line_chart(national: pd.DataFrame) -> go.Figure:
             name="Consumption",
             mode="lines+markers",
             line=dict(color=PALETTE["blue"], width=3),
+            hovertemplate="<b>Year:</b> %{x}<br><b>Consumption:</b> %{y:.2f} TWh<extra>Total electricity demand or final consumption.</extra>",
         )
     )
     fig.update_layout(
@@ -131,6 +133,7 @@ def balance_chart(national: pd.DataFrame) -> go.Figure:
             y=national["domestic_gap_twh"],
             marker_color=colors,
             name="Domestic production gap",
+            hovertemplate="<b>Year:</b> %{x}<br><b>Domestic gap:</b> %{y:.2f} TWh<extra>Production minus consumption before imports and exports.</extra>",
         )
     )
     fig.add_hline(y=0, line_color="#94a3b8", line_width=1)
@@ -166,6 +169,9 @@ def generation_mix_chart(national: pd.DataFrame) -> go.Figure:
             "Solar": PALETTE["cyan"],
             "Wind": PALETTE["violet"],
         },
+    )
+    fig.update_traces(
+        hovertemplate="<b>Year:</b> %{x}<br><b>Generation:</b> %{y:.2f} TWh<extra>Annual electricity generation by source.</extra>"
     )
     fig.update_layout(
         margin=dict(l=20, r=20, t=30, b=20),
@@ -203,6 +209,9 @@ def energy_mix_share_chart(national: pd.DataFrame) -> go.Figure:
             "Wind": PALETTE["violet"],
         },
     )
+    fig.update_traces(
+        hovertemplate="<b>Year:</b> %{x}<br><b>Share:</b> %{y:.1f}%<extra>Share of annual electricity generation by source.</extra>"
+    )
     fig.update_layout(
         barmode="stack",
         margin=dict(l=20, r=20, t=30, b=20),
@@ -222,6 +231,7 @@ def trade_chart(national: pd.DataFrame) -> go.Figure:
             y=national["imports_twh"],
             name="Imports",
             marker_color=PALETTE["blue"],
+            hovertemplate="<b>Year:</b> %{x}<br><b>Imports:</b> %{y:.2f} TWh<extra>Electricity brought into Kyrgyzstan from other systems.</extra>",
         )
     )
     fig.add_trace(
@@ -230,6 +240,8 @@ def trade_chart(national: pd.DataFrame) -> go.Figure:
             y=-national["exports_twh"],
             name="Exports",
             marker_color=PALETTE["green"],
+            hovertemplate="<b>Year:</b> %{x}<br><b>Exports:</b> %{customdata:.2f} TWh<extra>Electricity sent from Kyrgyzstan to other systems.</extra>",
+            customdata=national["exports_twh"],
         )
     )
     fig.add_trace(
@@ -239,6 +251,7 @@ def trade_chart(national: pd.DataFrame) -> go.Figure:
             name="Net imports",
             mode="lines+markers",
             line=dict(color=PALETTE["ink"], width=3),
+            hovertemplate="<b>Year:</b> %{x}<br><b>Net imports:</b> %{y:.2f} TWh<extra>Imports minus exports. Higher values indicate greater import dependence.</extra>",
         )
     )
     fig.add_hline(y=0, line_color="#94a3b8", line_width=1)
@@ -263,6 +276,7 @@ def time_intelligence_chart(national: pd.DataFrame) -> go.Figure:
             y=national["demand_yoy_pct"],
             name="Demand YoY",
             marker_color=PALETTE["blue"],
+            hovertemplate="<b>Year:</b> %{x}<br><b>Demand YoY:</b> %{y:.1f}%<extra>Year-on-year growth in electricity consumption.</extra>",
         )
     )
     fig.add_trace(
@@ -271,6 +285,7 @@ def time_intelligence_chart(national: pd.DataFrame) -> go.Figure:
             y=national["production_yoy_pct"],
             name="Production YoY",
             marker_color=PALETTE["teal"],
+            hovertemplate="<b>Year:</b> %{x}<br><b>Production YoY:</b> %{y:.1f}%<extra>Year-on-year growth in domestic electricity generation.</extra>",
         )
     )
     fig.add_trace(
@@ -280,6 +295,7 @@ def time_intelligence_chart(national: pd.DataFrame) -> go.Figure:
             name="Deviation from 3-year demand trend",
             mode="lines+markers",
             line=dict(color=PALETTE["ink"], width=3),
+            hovertemplate="<b>Year:</b> %{x}<br><b>Trend deviation:</b> %{y:.1f}%<extra>Latest demand compared with the 3-year rolling demand trend.</extra>",
         )
     )
     fig.add_hline(y=0, line_color="#94a3b8", line_width=1)
@@ -309,6 +325,9 @@ def scenario_spread_chart(scenarios: pd.DataFrame) -> go.Figure:
         },
     )
     fig.update_traces(line=dict(width=3))
+    fig.update_traces(
+        hovertemplate="<b>Month:</b> %{x|%b %Y}<br><b>Forecast demand:</b> %{y:.2f} TWh<extra>Scenario-based monthly demand forecast.</extra>"
+    )
     fig.update_layout(
         margin=dict(l=20, r=20, t=30, b=20),
         height=360,
@@ -355,6 +374,7 @@ def regional_risk_chart(regional_risk: pd.DataFrame) -> go.Figure:
             marker_color=ordered["risk"].map(colors),
             text=ordered["risk"],
             textposition="inside",
+            hovertemplate="<b>Region:</b> %{y}<br><b>Risk score:</b> %{x:.1f}<extra>Regional risk combines deficit, demand concentration, and distribution losses.</extra>",
         )
     )
     fig.update_layout(
@@ -377,6 +397,7 @@ def regional_bar_chart(regional: pd.DataFrame) -> go.Figure:
             orientation="h",
             name="Consumption",
             marker_color=PALETTE["blue"],
+            hovertemplate="<b>Region:</b> %{y}<br><b>Consumption:</b> %{x:.0f} GWh<extra>Regional electricity consumption.</extra>",
         )
     )
     fig.add_trace(
@@ -386,6 +407,7 @@ def regional_bar_chart(regional: pd.DataFrame) -> go.Figure:
             orientation="h",
             name="Production",
             marker_color=PALETTE["teal"],
+            hovertemplate="<b>Region:</b> %{y}<br><b>Production:</b> %{x:.0f} GWh<extra>Regional electricity production.</extra>",
         )
     )
     fig.update_layout(
@@ -409,6 +431,7 @@ def forecast_chart(forecast: pd.DataFrame) -> go.Figure:
             y=observed["forecast_twh"],
             name="Observed demand",
             line=dict(color=PALETTE["ink"], width=2),
+            hovertemplate="<b>Month:</b> %{x|%b %Y}<br><b>Observed pattern:</b> %{y:.2f} TWh<extra>Monthly pattern estimated from annual data for planning use.</extra>",
         )
     )
     fig.add_trace(
@@ -419,6 +442,7 @@ def forecast_chart(forecast: pd.DataFrame) -> go.Figure:
             mode="lines",
             line=dict(width=0),
             showlegend=False,
+            hovertemplate="<b>Month:</b> %{x|%b %Y}<br><b>Upper range:</b> %{y:.2f} TWh<extra>Upper confidence range around the forecast.</extra>",
         )
     )
     fig.add_trace(
@@ -430,6 +454,7 @@ def forecast_chart(forecast: pd.DataFrame) -> go.Figure:
             fill="tonexty",
             fillcolor="rgba(37, 99, 235, 0.16)",
             line=dict(width=0),
+            hovertemplate="<b>Month:</b> %{x|%b %Y}<br><b>Lower range:</b> %{y:.2f} TWh<extra>Lower confidence range around the forecast.</extra>",
         )
     )
     fig.add_trace(
@@ -438,6 +463,7 @@ def forecast_chart(forecast: pd.DataFrame) -> go.Figure:
             y=future["forecast_twh"],
             name="Forecast demand",
             line=dict(color=PALETTE["blue"], width=3),
+            hovertemplate="<b>Month:</b> %{x|%b %Y}<br><b>Forecast demand:</b> %{y:.2f} TWh<extra>Scenario-adjusted demand forecast for planning, not dispatch.</extra>",
         )
     )
     fig.update_layout(
