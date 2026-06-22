@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from io import StringIO
 from pathlib import Path
 
@@ -21,6 +22,11 @@ class SourceStatus:
     name: str
     status: str
     detail: str
+    last_updated: str = ""
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
 
 def _fallback_national_data() -> pd.DataFrame:
@@ -88,9 +94,10 @@ def _read_owid_energy(timeout: int = 12) -> tuple[pd.DataFrame | None, SourceSta
             "Our World in Data",
             "live",
             "Loaded country-level annual electricity data for Kyrgyzstan.",
+            _utc_now(),
         )
     except Exception as exc:  # noqa: BLE001 - app should degrade gracefully.
-        return None, SourceStatus("Our World in Data", "fallback", str(exc))
+        return None, SourceStatus("Our World in Data", "fallback", str(exc), _utc_now())
 
 
 def _read_world_bank_indicator(indicator: str) -> pd.Series:
@@ -115,9 +122,10 @@ def _merge_world_bank(national: pd.DataFrame) -> tuple[pd.DataFrame, SourceStatu
             "World Bank",
             "live",
             "Merged electricity access and population indicators.",
+            _utc_now(),
         )
     except Exception as exc:  # noqa: BLE001
-        return national, SourceStatus("World Bank", "fallback", str(exc))
+        return national, SourceStatus("World Bank", "fallback", str(exc), _utc_now())
 
 
 def load_energy_dataset() -> tuple[pd.DataFrame, list[SourceStatus]]:

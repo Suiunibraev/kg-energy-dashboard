@@ -63,6 +63,16 @@ def ensure_national_metrics(national: pd.DataFrame) -> pd.DataFrame:
     return national
 
 
+def stop_with_data_error(exc: Exception) -> None:
+    st.error(
+        "The dashboard could not load the required energy data. "
+        "Please check the data files, required columns, and source connection settings."
+    )
+    with st.expander("Technical details"):
+        st.exception(exc)
+    st.stop()
+
+
 @st.cache_data(ttl=3600)
 def get_data() -> tuple[pd.DataFrame, pd.DataFrame, list]:
     national, statuses = load_energy_dataset()
@@ -71,7 +81,10 @@ def get_data() -> tuple[pd.DataFrame, pd.DataFrame, list]:
     return national, regional, statuses
 
 
-national_df, regional_df, source_statuses = get_data()
+try:
+    national_df, regional_df, source_statuses = get_data()
+except Exception as exc:  # noqa: BLE001 - user-facing dashboard should fail clearly.
+    stop_with_data_error(exc)
 
 st.sidebar.title("Dashboard controls")
 year_min = int(national_df["year"].min())
@@ -84,6 +97,8 @@ st.sidebar.caption("Data status")
 for status in source_statuses:
     label = "Live" if status.status == "live" else "Fallback"
     st.sidebar.write(f"{status.name}: {label}")
+    if status.last_updated:
+        st.sidebar.caption(f"Updated {status.last_updated}")
 
 filtered = national_df[national_df["year"].between(selected_years[0], selected_years[1])].copy()
 latest = filtered.iloc[-1]
@@ -103,7 +118,9 @@ scenario_forecasts = pd.concat(
 )
 
 st.title("Kyrgyzstan Energy Intelligence Dashboard")
-st.markdown("Decision-support dashboard for electricity security, seasonal risk, and regional planning.")
+st.markdown(
+    "For policymakers and energy planners: monitor Kyrgyzstan's electricity security, seasonal demand risk, imports, regional deficits, and forecast uncertainty."
+)
 
 st.markdown(
     f"""
@@ -138,12 +155,21 @@ metric_cols[2].metric("Surplus / deficit before trade", f"{latest['domestic_gap_
 metric_cols[3].metric("Balance after imports / exports", f"{latest['net_balance_twh']:.2f} TWh")
 metric_cols[4].metric("Net imports", f"{latest['net_imports_twh']:.1f} TWh")
 metric_cols[5].metric("Security index", f"{security['score']:.1f}/100", security["label"])
+metric_cols[2].caption("Production minus consumption before imports and exports.")
+metric_cols[5].caption("Composite 0-100 score based on balance, dependency, growth, and reserve margin.")
 
 st.info(summary_text)
+st.markdown(
+    f"""
+    - Current national risk: **{briefing["status"]}**
+    - Main cause of risk: **{briefing["main_driver"]}**
+    - Recommended next action: **{actions.iloc[0]["Recommended action"] if not actions.empty else "Continue monitoring system indicators."}**
+    """
+)
 
 briefing_pdf = build_ministry_briefing_pdf(latest, security, briefing, summary_text, actions, rules)
 st.download_button(
-    "Generate Ministry Briefing (PDF)",
+    "Download Executive Energy Briefing",
     briefing_pdf,
     file_name="kyrgyzstan_energy_situation_briefing.pdf",
     mime="application/pdf",
@@ -173,6 +199,7 @@ with tabs[0]:
     change_cols[2].metric("Net imports YoY", f"{changes['imports_yoy_pct']:.1f}%")
     change_cols[3].metric("Hydro share change", f"{changes['hydro_share_change_pct']:.1f} pp")
     change_cols[4].metric("Demand trend deviation", f"{changes['seasonal_deviation_index']:.1f}%")
+    change_cols[4].caption("Latest demand compared with its 3-year rolling trend.")
 
 with tabs[1]:
     st.subheader("Policy rules and audit trail")
@@ -226,7 +253,8 @@ with tabs[3]:
     )
     map_df = regional_df.copy()
     map_df["marker_size"] = (map_df["consumption_gwh"] / map_df["consumption_gwh"].max() * 28 + 8).round(1)
-    st.map(map_df, latitude="lat", longitude="lon", size="marker_size", color="#2563eb")
+    map_df["color"] = "#2563eb"
+    st.map(map_df, latitude="lat", longitude="lon", size="marker_size", color="color")
 
     left, right = st.columns([1.15, 1])
     left.plotly_chart(regional_bar_chart(regional_df), width="stretch")
@@ -272,7 +300,8 @@ with tabs[4]:
 with tabs[5]:
     st.subheader("Data sources and implementation notes")
     source_html = "".join(
-        f'<span class="source-pill">{status.name}: {"live" if status.status == "live" else "fallback"}</span>'
+        f'<span class="source-pill">{status.name}: {"live" if status.status == "live" else "fallback"}'
+        f'{f" | {status.last_updated}" if status.last_updated else ""}</span>'
         for status in source_statuses
     )
     st.markdown(source_html, unsafe_allow_html=True)
@@ -296,3 +325,10 @@ with tabs[5]:
         file_name="kyrgyzstan_energy_regions_starter.csv",
         mime="text/csv",
     )
+
+st.divider()
+st.caption(
+    "Data sources: Our World in Data, World Bank, packaged regional starter data. "
+    "Built with Streamlit, Plotly, Pandas, and Statsmodels. "
+    "GitHub: https://github.com/Suiunibraev/kg-energy-dashboard"
+)
