@@ -1,145 +1,327 @@
 # Kyrgyzstan Energy Intelligence Dashboard
 
-A production-oriented Streamlit dashboard for monitoring Kyrgyzstan's electricity system and presenting seasonal demand forecasts in a format that non-technical Ministry staff can use.
+A Streamlit-based electricity intelligence and policy-support dashboard for the Kyrgyz Republic.
 
-The application combines:
+The dashboard brings national electricity monitoring, scenario forecasting, regional planning indicators, explainable policy rules, recommended actions, and a downloadable executive briefing into one interface. It is designed as a transparent planning prototype—not as a real-time dispatch system or an official Ministry methodology.
 
-- National electricity monitoring using public data from Our World in Data and World Bank indicators.
-- Clear separation between the domestic production gap and the net balance after imports/exports.
-- An explainable Energy Security Index with auditable policy rules and recommended actions.
-- Executive situation briefing and downloadable PDF briefing for meetings.
-- Regional comparison views with a clearly labeled starter regional dataset that can be replaced by Ministry feeds.
-- Seasonal demand forecasting with confidence bands and dry, normal, and wet hydropower scenarios.
-- A Ministry handoff one-pager in `docs/MINISTRY_ONE_PAGER.md`.
+## Project Purpose
 
-## Why This Matters
+Electricity data is most useful when decision-makers can connect it to practical questions:
 
-Energy ministries do not only need charts. They need repeatable interpretation, clear risk triggers, and meeting-ready outputs. This dashboard frames electricity data around practical planning questions:
+- Is domestic generation keeping pace with demand?
+- How dependent is the system on electricity imports?
+- What changes under dry, normal, and wet hydropower conditions?
+- Which regional indicators deserve planning attention?
+- Why was a particular action recommended?
+- Which results are official, estimated, or demonstration-only?
 
-- Is domestic production keeping pace with demand?
-- Are imports becoming more important to system balance?
-- Which regions should receive planning attention first?
-- How does winter peak demand change under dry hydropower conditions?
-- What action should be considered next?
+The project aims to make those questions easier to answer while keeping formulas, assumptions, triggers, and data limitations visible.
 
-## Demo
+## Intended Users
 
-- Live Streamlit app: add your deployed Streamlit URL here.
-- Screenshots or GIFs: add images under `docs/` and link them here after deployment.
+The dashboard is intended for:
 
-## Quick Start
+- Ministry leadership and non-technical policy staff
+- Electricity-sector planners and analysts
+- Government briefing and coordination teams
+- Development partners and energy-policy researchers
+- Technical reviewers evaluating data contracts, methods, and deployment readiness
+
+It can support monitoring, scenario discussion, and meeting preparation. It should not be used for dispatch, procurement, investment approval, or binding policy decisions without official operational data and expert validation.
+
+## Key Features
+
+- Executive situation panel with current status, main risk driver, key concern, and outlook
+- National production, consumption, trade, generation-mix, and balance monitoring
+- Clear distinction between the domestic production gap and the balance after trade
+- Explainable 0–100 Energy Security Index with a component breakdown
+- Auditable policy-rule thresholds and current trigger values
+- Recommended actions with the evidence behind each recommendation
+- “What Changed Since Last Year?” year-over-year insights
+- Dry, Normal, and Wet year Scenario Impact Analysis
+- Seasonal demand forecasts with confidence bands and peak-demand indicators
+- Regional map, production-demand comparison, and risk ranking
+- Regional population, demand per capita, national demand share, and data-quality labels
+- Downloadable Executive Energy Briefing PDF
+- Live public-data loading with packaged fallback data
+
+## Architecture
+
+```mermaid
+flowchart TD
+    A["Public sources<br/>Our World in Data, World Bank,<br/>National Statistical Committee"] --> B["energy_dashboard/data_sources.py"]
+    C["Packaged starter data<br/>national fallback and regional CSV"] --> B
+    B --> D["app.py<br/>Streamlit composition and controls"]
+    B --> E["energy_dashboard/forecasting.py<br/>Monthly history and scenarios"]
+    E --> F["energy_dashboard/policy.py<br/>Security Index, rules, risks,<br/>actions, and briefing text"]
+    B --> F
+    D --> G["energy_dashboard/ui.py<br/>Plotly charts and theme"]
+    F --> D
+    D --> H["energy_dashboard/reporting.py<br/>Executive PDF briefing"]
+    I["tests/test_data_contract.py"] --> B
+    I --> E
+    I --> F
+```
+
+## Module Breakdown
+
+| Module | Responsibility |
+| --- | --- |
+| `app.py` | Streamlit entry point, controls, page composition, tables, and downloads |
+| `energy_dashboard/data_sources.py` | Public data loaders, fallback data, derived national metrics, and regional planning indicators |
+| `energy_dashboard/forecasting.py` | Synthetic monthly history, Holt-Winters forecasting, confidence bands, and scenario multipliers |
+| `energy_dashboard/policy.py` | Energy Security Index, policy rules, year-over-year insights, regional risk, scenario impacts, and recommended actions |
+| `energy_dashboard/reporting.py` | ReportLab generation of the Executive Energy Briefing PDF |
+| `energy_dashboard/ui.py` | Plotly charts, visual definitions, and Streamlit theme helpers |
+| `data/regional_energy_starter.csv` | Transparent regional electricity starter dataset |
+| `docs/MINISTRY_ONE_PAGER.md` | Non-technical Ministry handoff document |
+| `tests/test_data_contract.py` | Data, forecast, policy, and regional contract checks |
+
+## Data Sources and Data Quality
+
+### National electricity data
+
+The primary live national source is the [Our World in Data energy dataset](https://github.com/owid/energy-data), used for available annual electricity generation, demand, hydropower, fossil generation, net electricity imports, and population fields.
+
+The [World Bank Open Data API](https://data.worldbank.org/country/kyrgyz-republic) supplements population and electricity-access indicators where available.
+
+If public endpoints are unavailable, the application uses packaged starter national data for 2000–2024 so that the interface remains usable. The sidebar identifies sources as live or fallback.
+
+Displayed “Loaded at” timestamps indicate when the application requested the data. They are not source-publication dates.
+
+### Regional population
+
+Regional population uses [official public estimates from the National Statistical Committee of the Kyrgyz Republic](https://stat.gov.kg/media/files/4c29e08a-580e-42d4-92c6-65cdf5a1554c.pptx). The current mapping represents population as of January 1, 2025, used as the end-2024 population position.
+
+### Data-quality classifications
+
+The Regional View separates metrics into three categories:
+
+| Classification | Meaning |
+| --- | --- |
+| **Official** | Directly sourced from an official public statistical source |
+| **Estimated** | Calculated by combining data with different provenance or by applying a transparent formula |
+| **Demonstration** | Based on the packaged regional electricity starter dataset and unsuitable for operational decisions |
+
+Regional population is classified as **Official**. Demand per capita and regional demand share are **Estimated** because they use demonstration electricity demand. Regional electricity production, consumption, losses, balance, status, and risk ranking are **Demonstration**.
+
+## National Electricity Metrics
+
+The dashboard calculates:
+
+```python
+domestic_gap_twh = production_twh - consumption_twh
+net_balance_twh = production_twh + imports_twh - consumption_twh - exports_twh
+net_imports_twh = imports_twh - exports_twh
+hydro_share_pct = hydro_twh / production_twh * 100
+```
+
+- **Domestic gap** shows whether domestic production covers consumption before trade.
+- **Net balance** includes imports and exports.
+- **Net imports** measure imports minus exports.
+- **Hydropower share** indicates dependence on hydropower within domestic generation.
+
+## Energy Security Index Methodology
+
+The Energy Security Index is an explainable policy prototype scored from 0 to 100:
+
+| Component | Maximum contribution | Interpretation |
+| --- | ---: | --- |
+| Production coverage | 35 | Rewards domestic production coverage relative to consumption |
+| Hydropower dependency | 20 | Reduces the score when hydropower reliance creates dry-year exposure |
+| Recent demand growth | 20 | Reduces the score when demand grows quickly |
+| Forecast reserve margin | 25 | Rewards a larger supply cushion relative to forecast demand |
+
+Risk bands:
+
+- **Secure:** 75 or higher
+- **Moderate Risk:** 50–74.9
+- **High Risk:** below 50
+
+The dashboard displays each component’s weight, current indicator, contribution, and explanation. Policy rules separately show the thresholds crossed by domestic deficit, import dependency, hydropower vulnerability, demand growth, and forecast reserve margin.
+
+The weights, thresholds, and risk bands have not been formally adopted by the Ministry. They require review and calibration by energy-sector experts before operational use.
+
+## Forecasting Methodology
+
+Forecasting is implemented in `energy_dashboard/forecasting.py`.
+
+Because the available public electricity series is annual, the application creates an estimated monthly history using:
+
+- Winter-weighted monthly electricity demand
+- Separate monthly hydropower seasonality weights
+- Up to ten years of recent annual observations
+
+The primary forecast uses Holt-Winters exponential smoothing with:
+
+- Additive trend
+- Multiplicative seasonality
+- A 12-month seasonal period
+
+If model fitting fails, the application falls back to a seasonal average with a simple trend. Confidence bands use the fitted residual standard deviation and a `1.64` multiplier.
+
+Planning scenarios apply the existing demand and hydropower multipliers:
+
+| Scenario | Demand multiplier | Hydropower availability index |
+| --- | ---: | ---: |
+| Normal year | 1.00 | 1.00 |
+| Dry year | 1.04 | 0.88 |
+| Wet year | 0.98 | 1.08 |
+
+Scenario Impact Analysis compares forecast demand, the unchanged Security Index, risk level, estimated net balance, and key concern across all three scenarios.
+
+### Forecast limitations
+
+- Monthly history is estimated from annual data rather than observed monthly demand.
+- Confidence bands are statistical approximations, not calibrated probabilistic forecasts.
+- The model does not currently include reservoir levels, inflows, snowpack, weather, plant availability, outages, fuel constraints, or network constraints.
+- Forecasts are planning aids and should not be treated as dispatch instructions.
+
+## Regional Planning Layer and Limitations
+
+The Regional View preserves the starter electricity dataset structure:
+
+```text
+year
+region
+lat
+lon
+production_gwh
+consumption_gwh
+distribution_losses_pct
+```
+
+The application adds population and derives:
+
+```python
+balance_gwh = production_gwh - consumption_gwh
+demand_per_capita_kwh = consumption_gwh * 1_000_000 / population
+demand_share_pct = consumption_gwh / national_demand_gwh * 100
+```
+
+Important limitations:
+
+- Regional production, consumption, and distribution losses are demonstration values, not official operational records.
+- Demand per capita combines official population with demonstration demand.
+- Regional demand shares are not a reconciled allocation of the national total.
+- Regional risk scores inherit the limitations of the starter electricity and losses data.
+- Map coordinates support visualization and are not network-asset locations.
+
+The current regional layer is useful for workflow design and data-contract discussion. It must be replaced with validated Ministry feeds before use in budgeting, procurement, dispatch, infrastructure prioritization, or investment approval.
+
+## Local Run Instructions
+
+Requirements:
+
+- Python 3.11 or a compatible version
+- Internet access for live public sources; fallback data is used when requests fail
 
 ```bash
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 streamlit run app.py
 ```
 
-## Data Sources
+Open the local URL displayed by Streamlit, normally `http://localhost:8501`.
 
-The app is designed to fetch public data at runtime and gracefully fall back to packaged starter data if a network request fails.
+## Deployment Setup
 
-- Our World in Data energy dataset: annual electricity generation and demand fields for Kyrgyzstan.
-- World Bank Open Data API: electricity access and population indicators.
-- Starter regional data in `data/regional_energy_starter.csv`: estimated regional distribution values for demonstration and workflow design only.
+The repository is configured for Streamlit Community Cloud with:
 
-The public sources provide strong country-level coverage. Public region-level operational data is not consistently available, so the bundled regional file is intentionally small, transparent, and easy to replace.
+- `app.py`
+- `requirements.txt`
+- `runtime.txt`
+- `.streamlit/config.toml`
 
-IEA and Kyrgyzstan National Statistics Committee data can be added through the same data contract when a stable public CSV/API or Ministry-provided extract is available. The current app keeps the live public loaders limited to endpoints that can run reliably on Streamlit Cloud without private credentials.
+Deployment steps:
 
-## How the Ministry Can Connect Internal Data
+1. Push the repository to GitHub.
+2. Sign in to [Streamlit Community Cloud](https://share.streamlit.io).
+3. Create an application from the repository.
+4. Set the main file path to `app.py`.
+5. Deploy or reboot the application.
 
-The app uses a narrow data contract so Ministry systems can be connected without redesigning the dashboard.
-
-For national annual data, provide a CSV, database table, or API response with:
-
-| column | meaning |
-| --- | --- |
-| `year` | calendar year |
-| `production_twh` | total electricity produced |
-| `consumption_twh` | total electricity demand or final consumption |
-| `hydro_twh` | hydropower generation |
-| `thermal_twh` | thermal generation |
-| `imports_twh` | electricity imports |
-| `exports_twh` | electricity exports |
-
-The dashboard calculates:
-
-| metric | formula | meaning |
-| --- | --- | --- |
-| `domestic_gap_twh` | `production_twh - consumption_twh` | Whether domestic production covers demand before imports |
-| `net_balance_twh` | `production_twh + imports_twh - consumption_twh - exports_twh` | Whether supply balances demand after electricity trade |
-
-For regional data, provide:
-
-| column | meaning |
-| --- | --- |
-| `year` | calendar year |
-| `region` | oblast or city name |
-| `lat` / `lon` | map coordinates for the regional marker |
-| `production_gwh` | regional electricity production |
-| `consumption_gwh` | regional electricity consumption |
-| `distribution_losses_pct` | estimated or measured losses |
-
-Integration points:
-
-- Replace `data/regional_energy_starter.csv` with official Ministry regional data using the same columns.
-- Add database or API logic in `energy_dashboard/data_sources.py`.
-- Keep the return shape of `load_energy_dataset()` unchanged so the Streamlit UI continues to work.
-- Add credentials through Streamlit Cloud secrets, not hard-coded files.
-
-## Deployment on Streamlit Cloud
-
-1. Create a new GitHub repository.
-2. From this folder, run:
-
-```bash
-git add .
-git commit -m "Build Kyrgyzstan energy dashboard"
-git branch -M main
-git remote add origin https://github.com/<account>/<repo>.git
-git push -u origin main
-```
-
-3. Go to [share.streamlit.io](https://share.streamlit.io).
-4. Select the repository and set the main file path to `app.py`.
-5. Deploy.
-
-The included `requirements.txt`, `.streamlit/config.toml`, and `runtime.txt` are ready for Streamlit Cloud.
+If private Ministry APIs or databases are added, store credentials in Streamlit secrets or an approved secret-management system. Do not commit credentials to the repository.
 
 ## Testing
 
-```bash
-python -m compileall app.py energy_dashboard tests
-python -c "from tests.test_data_contract import test_national_data_contract, test_regional_data_contract, test_forecast_contract; test_national_data_contract(); test_regional_data_contract(); test_forecast_contract(); print('checks passed')"
-```
-
-If you prefer pytest:
+Install development dependencies:
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest -q
 ```
 
-## Project Structure
+Run compilation checks:
 
-```text
-app.py                         Streamlit app entry point
-energy_dashboard/
-  data_sources.py              Public API loading and starter fallback data
-  forecasting.py               Seasonal forecast logic
-  ui.py                        Chart and UI helper functions
-data/
-  regional_energy_starter.csv  Replaceable regional starter dataset
-docs/
-  MINISTRY_ONE_PAGER.md        Non-technical delivery handout
-tests/
-  test_data_contract.py        Basic data-contract checks
+```bash
+python3 -m compileall app.py energy_dashboard tests
 ```
 
-## Important Assumptions
+Run the full test suite:
 
-- Public national data is suitable for the initial version and demonstration.
-- Regional values in the starter file are not official operational records.
-- Forecasts are planning aids, not dispatch instructions. They should be recalibrated with Ministry demand, reservoir, weather, and plant availability data before operational use.
+```bash
+python3 -m pytest -q
+```
+
+If `pytest` is not installed, run the current contract tests directly:
+
+```bash
+python3 -c "from tests.test_data_contract import test_national_data_contract, test_regional_data_contract, test_forecast_contract, test_security_index_contract, test_policy_rules_contract, test_regional_risk_and_actions_contract; test_national_data_contract(); test_regional_data_contract(); test_forecast_contract(); test_security_index_contract(); test_policy_rules_contract(); test_regional_risk_and_actions_contract(); print('checks passed')"
+```
+
+## Screenshots
+
+> Add final screenshots after deployment. Recommended files and views are listed below.
+
+### Executive situation briefing
+
+![Placeholder: Executive situation briefing](docs/screenshots/executive-situation-placeholder.png)
+
+### Scenario Impact Analysis
+
+![Placeholder: Dry, Normal, and Wet year comparison](docs/screenshots/scenario-impact-placeholder.png)
+
+### Regional planning layer
+
+![Placeholder: Regional map, risk ranking, and data quality](docs/screenshots/regional-planning-placeholder.png)
+
+### Executive Energy Briefing PDF
+
+![Placeholder: Downloadable executive PDF](docs/screenshots/executive-pdf-placeholder.png)
+
+## Ministry Handoff Roadmap
+
+### Data readiness
+
+- Replace regional starter electricity data with validated Ministry regional feeds.
+- Connect observed monthly demand, generation, imports, exports, and losses.
+- Add reservoir levels, inflows, snowpack, weather, outages, maintenance, and plant availability.
+- Record source publication dates and revision status, not only application load times.
+- Add automated validation, reconciliation, and missing-data alerts.
+
+### Methodology validation
+
+- Review Security Index weights, thresholds, and risk bands with sector experts.
+- Define an approved regional-risk methodology.
+- Calibrate forecast uncertainty using observed monthly errors.
+- Validate recommended actions and escalation rules against Ministry procedures.
+
+### Operational integration
+
+- Add secure database or API connections and access controls.
+- Introduce data ownership, approval, and update workflows.
+- Add infrastructure, capacity, outage, and project trackers.
+- Establish audit logs and versioned methodology documentation.
+- Complete security, reliability, and user-acceptance testing before operational adoption.
+
+### Communication and reporting
+
+- Add verified screenshots and a live deployment link.
+- Embed selected charts in the PDF briefing.
+- Add Kyrgyz and Russian language support if required.
+- Provide user guidance, data dictionaries, and analyst training materials.
+
+## Current Readiness
+
+The dashboard is suitable for demonstration, policy-method discussion, portfolio review, and preparation for Ministry data integration. It is not yet an official operational energy-management system. Its strongest current value is transparency: data provenance, formulas, scenario assumptions, policy thresholds, and limitations are made visible so they can be reviewed and improved.
