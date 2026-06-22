@@ -12,6 +12,23 @@ import requests
 
 ROOT = Path(__file__).resolve().parents[1]
 REGIONAL_STARTER_PATH = ROOT / "data" / "regional_energy_starter.csv"
+REGIONAL_POPULATION_SOURCE_URL = (
+    "https://stat.gov.kg/media/files/4c29e08a-580e-42d4-92c6-65cdf5a1554c.pptx"
+)
+REGIONAL_POPULATION_SOURCE_LABEL = (
+    "National Statistical Committee of the Kyrgyz Republic, population estimates as of January 1, 2025"
+)
+REGIONAL_POPULATION_2025 = {
+    "Bishkek City": 1_321_900,
+    "Chuy": 971_300,
+    "Osh City": 473_500,
+    "Osh": 1_416_700,
+    "Jalal-Abad": 1_358_500,
+    "Batken": 594_700,
+    "Talas": 280_500,
+    "Naryn": 314_900,
+    "Issyk-Kul": 549_800,
+}
 
 OWID_ENERGY_CSV = "https://raw.githubusercontent.com/owid/energy-data/master/owid-energy-data.csv"
 WORLD_BANK_API = "https://api.worldbank.org/v2/country/KGZ/indicator/{indicator}?format=json&per_page=200"
@@ -189,3 +206,35 @@ def load_regional_dataset() -> pd.DataFrame:
     regional["balance_gwh"] = regional["production_gwh"] - regional["consumption_gwh"]
     regional["status"] = np.where(regional["balance_gwh"].ge(0), "Net producer", "Net consumer")
     return regional
+
+
+def add_regional_planning_metrics(regional: pd.DataFrame, national: pd.DataFrame) -> pd.DataFrame:
+    """Add transparent public and derived planning indicators to regional starter data."""
+    out = regional.copy()
+    out["population"] = out["region"].map(REGIONAL_POPULATION_2025)
+    out["demand_per_capita_kwh"] = np.where(
+        out["population"].gt(0),
+        out["consumption_gwh"] * 1_000_000 / out["population"],
+        np.nan,
+    )
+
+    regional_year = int(out["year"].max())
+    matching_national = national[national["year"].eq(regional_year)]
+    national_row = matching_national.iloc[-1] if not matching_national.empty else national.sort_values("year").iloc[-1]
+    national_demand_gwh = float(national_row["consumption_twh"]) * 1_000
+    out["demand_share_pct"] = np.where(
+        national_demand_gwh > 0,
+        out["consumption_gwh"] / national_demand_gwh * 100,
+        np.nan,
+    )
+
+    out["population_data_quality"] = "Official"
+    out["production_data_quality"] = "Demonstration"
+    out["consumption_data_quality"] = "Demonstration"
+    out["distribution_losses_data_quality"] = "Demonstration"
+    out["balance_data_quality"] = "Demonstration"
+    out["demand_per_capita_data_quality"] = "Estimated"
+    out["demand_share_data_quality"] = "Estimated"
+    out["risk_data_quality"] = "Demonstration"
+    out["population_source"] = REGIONAL_POPULATION_SOURCE_LABEL
+    return out

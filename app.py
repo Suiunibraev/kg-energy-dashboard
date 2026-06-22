@@ -3,7 +3,12 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from energy_dashboard.data_sources import load_energy_dataset, load_regional_dataset
+from energy_dashboard.data_sources import (
+    REGIONAL_POPULATION_SOURCE_URL,
+    add_regional_planning_metrics,
+    load_energy_dataset,
+    load_regional_dataset,
+)
 from energy_dashboard.forecasting import SCENARIOS, forecast_demand
 from energy_dashboard.policy import (
     calculate_security_index,
@@ -80,7 +85,7 @@ def stop_with_data_error(exc: Exception) -> None:
 def get_data() -> tuple[pd.DataFrame, pd.DataFrame, list]:
     national, statuses = load_energy_dataset()
     national = ensure_national_metrics(national)
-    regional = load_regional_dataset()
+    regional = add_regional_planning_metrics(load_regional_dataset(), national)
     return national, regional, statuses
 
 
@@ -294,15 +299,48 @@ with tabs[2]:
         )
 
 with tabs[3]:
-    st.subheader("Regional electricity picture")
+    st.subheader("Regional electricity planning layer")
     st.markdown(
-        '<p class="section-note">Regional ranking highlights where demand, deficits, and distribution losses create planning pressure.</p>',
+        '<p class="section-note">Regional ranking highlights where demand, deficits, distribution losses, population, and demand concentration create planning pressure.</p>',
         unsafe_allow_html=True,
     )
     st.warning(
-        "Regional values use a transparent starter dataset for demonstration and workflow design. "
-        "Replace them with official Ministry regional feeds before operational use."
+        "This is a mixed-quality planning layer. Population is official public data; electricity production, "
+        "consumption, and losses remain demonstration-only starter values. Derived indicators are not official statistics."
     )
+    with st.expander("Data sources, quality, and confidence notes", expanded=True):
+        st.markdown(
+            f"""
+            - **Official:** Regional population estimates are from the
+              [National Statistical Committee of the Kyrgyz Republic]({REGIONAL_POPULATION_SOURCE_URL}),
+              reported for January 1, 2025 and used as the end-2024 population position.
+            - **Estimated:** Demand per capita combines official population with demonstration electricity demand.
+              Regional demand share divides demonstration regional demand by the currently loaded national demand value
+              for the same year; the national source status is shown in the sidebar.
+            - **Demonstration:** Regional production, consumption, distribution losses, balance, status, and risk ranking
+              come from or depend on the packaged starter electricity dataset. They are workflow examples, not operational evidence.
+            """
+        )
+        quality_rows = pd.DataFrame(
+            [
+                ["Population", "Official", "Public regional population estimate at January 1, 2025."],
+                ["Production", "Demonstration", "Packaged starter electricity value."],
+                ["Consumption", "Demonstration", "Packaged starter electricity value."],
+                ["Distribution losses", "Demonstration", "Packaged starter electricity value."],
+                ["Demand per capita", "Estimated", "Demonstration demand divided by official population."],
+                ["Regional demand share", "Estimated", "Demonstration regional demand divided by national annual demand."],
+                ["Balance and status", "Demonstration", "Derived from demonstration production and consumption."],
+                ["Risk score and level", "Demonstration", "Derived from demonstration electricity and loss values."],
+            ],
+            columns=["Regional metric", "Data Quality", "Source or method"],
+        )
+        st.dataframe(quality_rows, width="stretch", hide_index=True)
+        st.caption(
+            "Confidence note: use population for broad planning context only. Do not use the regional electricity, "
+            "per-capita, demand-share, balance, or risk values for budgeting, dispatch, procurement, or investment "
+            "approval until they are replaced and validated against official Ministry regional feeds. The starter "
+            "regional demand values are not reconciled to the national total."
+        )
     map_df = regional_df.copy()
     map_df["marker_size"] = (map_df["consumption_gwh"] / map_df["consumption_gwh"].max() * 28 + 8).round(1)
     map_df["color"] = "#2563eb"
@@ -311,8 +349,7 @@ with tabs[3]:
     left, right = st.columns([1.15, 1])
     left.plotly_chart(regional_bar_chart(regional_df), width="stretch")
     right.plotly_chart(regional_risk_chart(regional_risk), width="stretch")
-    st.dataframe(
-        regional_risk[
+    regional_table = regional_risk[
             [
                 "region",
                 "risk",
@@ -320,12 +357,46 @@ with tabs[3]:
                 "status",
                 "production_gwh",
                 "consumption_gwh",
+                "population",
+                "demand_per_capita_kwh",
+                "demand_share_pct",
                 "balance_gwh",
                 "distribution_losses_pct",
+                "population_data_quality",
+                "consumption_data_quality",
+                "demand_per_capita_data_quality",
+                "demand_share_data_quality",
+                "risk_data_quality",
             ]
-        ],
+        ].rename(
+            columns={
+                "region": "Region",
+                "risk": "Risk",
+                "risk_score": "Risk score",
+                "status": "Status",
+                "production_gwh": "Production (GWh)",
+                "consumption_gwh": "Demand (GWh)",
+                "population": "Population",
+                "demand_per_capita_kwh": "Demand per capita (kWh)",
+                "demand_share_pct": "National demand share (%)",
+                "balance_gwh": "Balance (GWh)",
+                "distribution_losses_pct": "Distribution losses (%)",
+                "population_data_quality": "Population quality",
+                "consumption_data_quality": "Demand quality",
+                "demand_per_capita_data_quality": "Per-capita quality",
+                "demand_share_data_quality": "Demand-share quality",
+                "risk_data_quality": "Risk quality",
+            }
+        )
+    st.dataframe(
+        regional_table,
         width="stretch",
         hide_index=True,
+    )
+    st.caption(
+        f"Demonstration regional demand currently accounts for "
+        f"{regional_risk['demand_share_pct'].sum():.1f}% of the loaded national demand. "
+        "The difference confirms that the starter regional values are not a reconciled official allocation."
     )
 
 with tabs[4]:

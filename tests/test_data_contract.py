@@ -1,4 +1,4 @@
-from energy_dashboard.data_sources import load_energy_dataset, load_regional_dataset
+from energy_dashboard.data_sources import add_regional_planning_metrics, load_energy_dataset, load_regional_dataset
 from energy_dashboard.forecasting import forecast_demand
 from energy_dashboard.policy import (
     calculate_security_index,
@@ -33,6 +33,22 @@ def test_regional_data_contract():
     regional = load_regional_dataset()
     assert {"region", "lat", "lon", "production_gwh", "consumption_gwh", "balance_gwh"}.issubset(regional.columns)
     assert regional["region"].nunique() >= 7
+    national, _ = load_energy_dataset()
+    planning = add_regional_planning_metrics(regional, national)
+    assert {
+        "population",
+        "demand_per_capita_kwh",
+        "demand_share_pct",
+        "population_data_quality",
+        "consumption_data_quality",
+        "demand_per_capita_data_quality",
+        "demand_share_data_quality",
+        "risk_data_quality",
+    }.issubset(planning.columns)
+    assert planning["population"].notna().all()
+    assert planning["population_data_quality"].eq("Official").all()
+    assert planning["consumption_data_quality"].eq("Demonstration").all()
+    assert planning["demand_per_capita_data_quality"].eq("Estimated").all()
 
 
 def test_forecast_contract():
