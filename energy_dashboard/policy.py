@@ -122,7 +122,12 @@ def security_index_breakdown(national: pd.DataFrame, forecast: pd.DataFrame) -> 
             ),
         },
     ]
-    return pd.DataFrame(rows)
+    breakdown = pd.DataFrame(rows)
+    breakdown["component"] = breakdown["Component"]
+    breakdown["weight"] = [35, 20, 20, 25]
+    breakdown["score"] = [balance_score, hydro_score, growth_score, reserve_score]
+    breakdown["explanation"] = breakdown["Why it changed the score"]
+    return breakdown
 
 
 def evaluate_policy_rules(national: pd.DataFrame, security: dict) -> pd.DataFrame:
