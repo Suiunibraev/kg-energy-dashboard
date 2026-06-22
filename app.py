@@ -204,6 +204,9 @@ briefing_pdf = build_ministry_briefing_pdf(
     rules,
     scenario_impacts,
     scenario_impact_summary,
+    security_breakdown,
+    changes,
+    changes_summary,
 )
 st.download_button(
     "Download Executive Energy Briefing",
