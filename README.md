@@ -1,3 +1,4 @@
+PAUSED 
 # Kyrgyzstan Energy Intelligence Dashboard
 
 **Live Dashboard:** [https://kg-energy-dashboard.streamlit.app/#appropriate-uses](https://kg-energy-dashboard.streamlit.app/#appropriate-uses)
