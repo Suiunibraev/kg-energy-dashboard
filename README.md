@@ -1,5 +1,7 @@
 # Kyrgyzstan Energy Intelligence Dashboard
 
+**Live Dashboard:** [https://kg-energy-dashboard.streamlit.app/#appropriate-uses](https://kg-energy-dashboard.streamlit.app/#appropriate-uses)
+
 A Streamlit-based electricity intelligence and policy-support dashboard for the Kyrgyz Republic.
 
 The dashboard brings national electricity monitoring, scenario forecasting, regional planning indicators, explainable policy rules, recommended actions, and a downloadable executive briefing into one interface. It is designed as a transparent planning prototype—not as a real-time dispatch system or an official Ministry methodology.
