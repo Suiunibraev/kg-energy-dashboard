@@ -13,7 +13,7 @@ Electricity data is most useful when decision-makers can connect it to practical
 - What changes under dry, normal, and wet hydropower conditions?
 - Which regional indicators deserve planning attention?
 - Why was a particular action recommended?
-- Which results are official, estimated, or demonstration-only?
+- Which results are official, derived, forecast, fallback, or unavailable?
 
 The project aims to make those questions easier to answer while keeping formulas, assumptions, triggers, and data limitations visible.
 
@@ -85,7 +85,7 @@ The primary live national source is the [Our World in Data energy dataset](https
 
 The [World Bank Open Data API](https://data.worldbank.org/country/kyrgyz-republic) supplements population and electricity-access indicators where available.
 
-If public endpoints are unavailable, the application uses packaged starter national data for 2000–2024 so that the interface remains usable. The sidebar identifies sources as live or fallback.
+If the core public national endpoint is unavailable, the application uses packaged starter national data for 2000–2024 so that the interface remains usable. Fallback mode is identified with a prominent page-level warning; Security Index outputs and recommendations are marked provisional, and executive PDF export is disabled.
 
 Displayed “Loaded at” timestamps indicate when the application requested the data. They are not source-publication dates.
 
@@ -140,6 +140,8 @@ Risk bands:
 
 The dashboard displays each component’s weight, current indicator, contribution, and explanation. Policy rules separately show the thresholds crossed by domestic deficit, import dependency, hydropower vulnerability, demand growth, and forecast reserve margin.
 
+The reserve-margin component always uses a fixed 12-month demand forecast. Forecast horizon controls chart display only, so selecting a shorter or longer chart horizon does not alter the Security Index.
+
 The weights, thresholds, and risk bands have not been formally adopted by the Ministry. They require review and calibration by energy-sector experts before operational use.
 
 ## Forecasting Methodology
@@ -168,7 +170,9 @@ Planning scenarios apply the existing demand and hydropower multipliers:
 | Dry year | 1.04 | 0.88 |
 | Wet year | 0.98 | 1.08 |
 
-Scenario Impact Analysis compares forecast demand, the unchanged Security Index, risk level, estimated net balance, and key concern across all three scenarios.
+Scenario Impact Analysis compares forecast demand, the fixed-window Security Index, risk level, estimated net balance, and key concern across all three scenarios.
+
+The hydropower availability index is used in the scenario balance estimate, but scenario-adjusted production is not substituted into the Security Index. Differences in the Index across Dry, Normal, and Wet cases therefore come from the demand multipliers. This avoids presenting an unsupported hydrological production model as part of the score.
 
 ### Forecast limitations
 
@@ -211,7 +215,7 @@ Important limitations:
 - Production and distribution losses are unavailable and are not estimated.
 - Balance, producer/consumer status, and regional risk ranking are disabled.
 - Per-capita supply and national-demand share are derived comparisons, not official statistics or an energy-balance reconciliation.
-- Map coordinates support visualization and are not network-asset locations.
+- Map coordinates are demoted reference points only. They are not service-area boundaries, administrative polygons, or network-asset locations.
 
 The useful-supply values are official public data, but the regional layer remains unsuitable for balance, loss, or risk assessment until compatible official production and loss data are available.
 
@@ -290,7 +294,7 @@ python3 -c "from tests.test_data_contract import test_national_data_contract, te
 
 ### Regional planning layer
 
-![Placeholder: ПЭС useful-supply map, provenance, and data quality](docs/screenshots/regional-planning-placeholder.png)
+![Placeholder: ПЭС useful-supply ranking, provenance, derived context, and reference map](docs/screenshots/regional-planning-placeholder.png)
 
 ### Executive Energy Briefing PDF
 
@@ -330,4 +334,6 @@ python3 -c "from tests.test_data_contract import test_national_data_contract, te
 
 ## Current Readiness
 
-The dashboard is suitable for demonstration, policy-method discussion, portfolio review, and preparation for Ministry data integration. It is not yet an official operational energy-management system. Its strongest current value is transparency: data provenance, formulas, scenario assumptions, policy thresholds, and limitations are made visible so they can be reviewed and improved.
+The dashboard is suitable for strategic monitoring, policy-method discussion, portfolio review, and preparation for Ministry data integration. It is not an official operational energy-management system. Its strongest current value is transparency: data provenance, formulas, fallback state, scenario assumptions, policy thresholds, and limitations are made visible so they can be reviewed and improved.
+
+Version 1 credibility safeguards include a fixed 12-month Security Index assessment window, explicit scenario-method limitations, non-prescriptive recommendations, prominent fallback-mode signaling, disabled PDF export during fallback operation, and strict separation of official versus derived regional outputs.

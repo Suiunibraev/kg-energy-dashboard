@@ -14,6 +14,7 @@ POLICY_RULES = {
     "moderate_demand_growth_pct": 2,
     "low_reserve_margin_pct": 5,
 }
+ASSESSMENT_WINDOW_MONTHS = 12
 
 
 def _clip(value: float, lower: float, upper: float) -> float:
@@ -31,7 +32,11 @@ def security_band(score: float) -> tuple[str, str]:
 def calculate_security_index(national: pd.DataFrame, forecast: pd.DataFrame) -> dict[str, float | str]:
     latest = national.sort_values("year").iloc[-1]
     recent = national.sort_values("year").tail(6)
-    future = forecast[forecast["period"].eq("Forecast")].head(12)
+    future = forecast[forecast["period"].eq("Forecast")].head(ASSESSMENT_WINDOW_MONTHS)
+    if len(future) < ASSESSMENT_WINDOW_MONTHS:
+        raise ValueError(
+            f"Security Index requires a fixed {ASSESSMENT_WINDOW_MONTHS}-month forecast assessment window."
+        )
 
     balance_ratio = latest["production_twh"] / latest["consumption_twh"]
     balance_score = _clip(balance_ratio / 1.05, 0, 1) * 35
@@ -63,10 +68,14 @@ def calculate_security_index(national: pd.DataFrame, forecast: pd.DataFrame) -> 
 
 
 def security_index_breakdown(national: pd.DataFrame, forecast: pd.DataFrame) -> pd.DataFrame:
-    """Return an auditable breakdown of the unchanged Energy Security Index."""
+    """Return an auditable breakdown using the fixed 12-month assessment window."""
     latest = national.sort_values("year").iloc[-1]
     recent = national.sort_values("year").tail(6)
-    future = forecast[forecast["period"].eq("Forecast")].head(12)
+    future = forecast[forecast["period"].eq("Forecast")].head(ASSESSMENT_WINDOW_MONTHS)
+    if len(future) < ASSESSMENT_WINDOW_MONTHS:
+        raise ValueError(
+            f"Security Index requires a fixed {ASSESSMENT_WINDOW_MONTHS}-month forecast assessment window."
+        )
 
     balance_ratio = float(latest["production_twh"]) / float(latest["consumption_twh"])
     balance_score = _clip(balance_ratio / 1.05, 0, 1) * 35
@@ -277,15 +286,15 @@ def recommended_actions(
     latest = national.sort_values("year").iloc[-1]
     demand = float(latest["consumption_twh"])
     deficit = max(0, -float(latest["domestic_gap_twh"]))
-    winter_peak = float(peaks["winter_peak_twh"])
+    winter_monthly_max = float(peaks["winter_peak_twh"])
     actions = []
     if deficit > 0:
         actions.append(
             {
                 "Priority": "High",
-                "Recommended action": f"Secure winter import or reserve contracts covering at least {deficit * 0.25:.1f} TWh.",
+                "Recommended action": "Review winter import, reserve, and contingency options against the domestic supply gap.",
                 "Trigger / evidence": f"Domestic deficit is {deficit:.1f} TWh before electricity trade.",
-                "Reason": "Domestic generation is below current consumption before trade.",
+                "Reason": "Domestic generation is below current consumption before trade; any procurement quantity requires an approved operational methodology.",
             }
         )
     if float(security["hydro_share_pct"]) > POLICY_RULES["hydro_vulnerability_pct"]:
@@ -300,16 +309,16 @@ def recommended_actions(
                 "Reason": "Hydropower dependency creates seasonal and climate vulnerability.",
             }
         )
-    if winter_peak > demand / 12 * 1.15:
+    if winter_monthly_max > demand / 12 * 1.15:
         actions.append(
             {
                 "Priority": "Medium",
-                "Recommended action": "Target winter demand-response measures for peak months.",
+                "Recommended action": "Review winter demand-response readiness for the highest-energy forecast months.",
                 "Trigger / evidence": (
-                    f"Winter peak demand is {winter_peak:.2f} TWh, above the "
-                    f"{demand / 12 * 1.15:.2f} TWh peak threshold."
+                    f"Highest forecast winter-month energy is {winter_monthly_max:.2f} TWh, above the "
+                    f"{demand / 12 * 1.15:.2f} TWh monthly planning threshold."
                 ),
-                "Reason": "Peak risk is concentrated in winter rather than annual totals.",
+                "Reason": "Monthly energy pressure is concentrated in winter rather than evenly distributed across the year.",
             }
         )
     flagged_rules = rules[rules["Status"].isin(["High", "Flagged"])]
@@ -360,7 +369,11 @@ def scenario_impact_analysis(
 
     for scenario_name in ["Dry year", "Normal year", "Wet year"]:
         forecast = scenario_forecasts[scenario_name]
-        future = forecast[forecast["period"].eq("Forecast")].head(12)
+        future = forecast[forecast["period"].eq("Forecast")].head(ASSESSMENT_WINDOW_MONTHS)
+        if len(future) < ASSESSMENT_WINDOW_MONTHS:
+            raise ValueError(
+                f"Scenario assessment requires {ASSESSMENT_WINDOW_MONTHS} forecast months."
+            )
         forecast_demand = float(future["forecast_twh"].sum())
         hydro_index = float(future["hydro_availability_index"].iloc[0])
         period_fraction = len(future) / 12
@@ -397,8 +410,8 @@ def scenario_impact_analysis(
         f"The dry-year case is the most constrained, with a {dry['Security Index']} Security Index "
         f"and an estimated net balance of {dry['Net balance estimate']}. "
         f"The wet-year case improves the index to {wet['Security Index']} and the estimated balance to "
-        f"{wet['Net balance estimate']}. The main planning sensitivity is hydropower availability, "
-        "while forecast demand also changes across scenarios."
+        f"{wet['Net balance estimate']}. Scenario-adjusted hydropower affects the balance estimate, but not "
+        "the Security Index production input; index differences come from the scenario demand multipliers."
     )
     return comparison, summary
 

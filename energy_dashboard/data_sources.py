@@ -41,6 +41,12 @@ class SourceStatus:
     last_updated: str = ""
 
 
+def national_data_mode(statuses: list[SourceStatus]) -> str:
+    """Return the credibility mode for the core national electricity series."""
+    owid = next((status for status in statuses if status.name == "Our World in Data"), None)
+    return "live" if owid is not None and owid.status == "live" else "fallback"
+
+
 def _utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 

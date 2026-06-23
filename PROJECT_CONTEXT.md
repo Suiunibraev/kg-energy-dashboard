@@ -33,7 +33,7 @@ runtime.txt                    Streamlit Cloud Python runtime setting
 1. `app.py` configures Streamlit and applies the custom theme from `energy_dashboard/ui.py`.
 2. `get_data()` loads national and regional data through `energy_dashboard/data_sources.py`.
 3. `ensure_national_metrics()` defensively creates missing derived columns such as `domestic_gap_twh`, `net_balance_twh`, `net_imports_twh`, `solar_twh`, and `wind_twh`.
-4. Sidebar controls choose the year range, hydropower planning scenario, and forecast horizon.
+4. Page-scoped controls choose the historical year range or forecast display horizon.
 5. `forecast_demand()` creates monthly demand forecasts.
 6. `policy.py` computes the Energy Security Index, policy rules, recommended actions, situation briefing, and time-intelligence indicators.
 7. `ui.py` renders Plotly charts with explanatory hover definitions.
@@ -41,34 +41,14 @@ runtime.txt                    Streamlit Cloud Python runtime setting
 
 ## Main User-Facing Sections
 
-- Executive situation panel:
-  - Today's energy status
-  - Main risk driver
-  - Key concern
-  - Outlook
-- Top KPI row:
-  - Total production
-  - Total consumption
-  - Surplus/deficit before trade
-  - Balance after imports/exports
-  - Net imports
-  - Energy Security Index
-- Definitions expander:
-  - Domestic gap
-  - Net balance
-  - Net imports
-  - Security index
-  - Reserve margin
-  - Hydro vulnerability
-  - Scenario spread
-- Download Executive Energy Briefing button
-- Tabs:
-  - Situation briefing
-  - Policy rules
-  - National monitoring
-  - Regional view
-  - Forecast uncertainty
-  - Data and handoff
+- Executive Overview with data year, source state, load time, current factual indicators, and recent-trend context
+- Energy Security Assessment with a fixed 12-month scoring window, scenario sensitivity, actions, evidence, and PDF
+- Policy Rules audit trail
+- National Monitoring historical charts
+- Regional Planning for official ПЭС useful supply and separately labeled derived context
+- Scenario Planning for monthly energy forecasts
+- Methodology
+- Data & Handoff
 
 ## Current Functionality
 
@@ -200,7 +180,7 @@ This supports the "what changed?" section.
 
 - Domestic deficit
 - Hydropower dependency
-- Winter peak demand
+- Highest forecast winter-month energy
 - Flagged policy rules
 
 Example actions include:
@@ -208,7 +188,6 @@ Example actions include:
 - Secure winter import or reserve contracts
 - Prepare dry-year hydropower contingency schedule
 - Target winter demand-response measures
-- Prioritize grid reinforcement and loss reduction in the highest-risk region
 - Review flagged policy rules in planning meetings
 
 These actions are intentionally simplified and should be validated by energy-sector experts before operational use.
@@ -397,12 +376,15 @@ Current repo workflow:
 
 ## Known Limitations
 
-- Regional data is a starter/demo dataset, not official operational data.
+- Regional useful-supply data is official 2024 ПЭС service-territory data; production, losses, balance, and risk remain unavailable.
 - Public national data is annual and country-level; it is not enough for dispatch-grade planning.
 - Forecast monthly seasonality is estimated from annual data.
 - Confidence bands are statistical approximations, not calibrated probabilistic forecasts.
 - Energy Security Index weights and thresholds are prototype policy assumptions.
+- The Security Index always uses a fixed 12-month demand assessment window; chart horizon does not change the score.
+- Scenario hydropower multipliers affect scenario balance estimates but do not replace current production in the Security Index.
 - Recommended actions are rule-based planning prompts, not binding operational recommendations.
+- When core national data falls back to packaged starter data, the app shows a prominent warning and disables PDF export.
 - Source "Loaded at" timestamps are app load/request times, not original source publication dates.
 - Solar and wind are supported in the UI/data contract, but public source rows may be zero or unavailable depending on data source.
 - The PDF briefing is text/table based; it does not yet embed charts.
@@ -435,12 +417,16 @@ Portfolio polish:
 
 ## Recent Important Changes
 
+- Completed the Version 1 credibility pass: fixed 12-month assessment window, explicit scenario limitation, corrected monthly-energy terminology, non-prescriptive recommendations, executive source context, regional visual hierarchy, and fallback safeguards.
 - Added policy decision-support layer in `energy_dashboard/policy.py`.
 - Added PDF briefing generator in `energy_dashboard/reporting.py`.
 - Added source load timestamps and safer load failure handling.
 - Added definitions expander and explanatory Plotly hover templates.
 - Added policy tests in `tests/test_data_contract.py`.
 - Integrated official 2024 ПЭС useful supply and disabled unsupported regional calculations.
+- Fixed the Security Index forecast assessment window at 12 months.
+- Added explicit fallback-mode warnings and disabled PDF export in fallback mode.
+- Renamed monthly forecast maxima to avoid implying instantaneous peak demand.
 
 ## Practical Notes For Future Sessions
 

@@ -8,6 +8,7 @@ from energy_dashboard.data_sources import (
     add_regional_planning_metrics,
     load_energy_dataset,
     load_regional_dataset,
+    national_data_mode,
 )
 from energy_dashboard.forecasting import SCENARIOS, forecast_demand
 from energy_dashboard.policy import (
@@ -31,6 +32,7 @@ from energy_dashboard.ui import (
     generation_mix_chart,
     line_chart,
     regional_bar_chart,
+    regional_reference_map,
     scenario_spread_chart,
     security_gauge,
     time_intelligence_chart,
@@ -117,6 +119,14 @@ for status in source_statuses:
         st.sidebar.caption(f"Loaded at {status.last_updated}")
 
 latest = national_df.sort_values("year").iloc[-1]
+data_mode = national_data_mode(source_statuses)
+fallback_mode = data_mode == "fallback"
+national_source_status = next(
+    (status for status in source_statuses if status.name == "Our World in Data"),
+    None,
+)
+source_status_label = "Live public national data" if not fallback_mode else "Packaged fallback national data"
+source_load_time = national_source_status.last_updated if national_source_status else "Not available"
 baseline_scenario = "Normal year"
 baseline_months = 18
 baseline_forecast = forecast_demand(national_df, months=baseline_months, scenario=baseline_scenario)
@@ -143,6 +153,12 @@ st.title("Kyrgyzstan Energy Intelligence Dashboard")
 st.markdown(
     "For policymakers and energy planners: monitor Kyrgyzstan's electricity security, seasonal demand risk, imports, official ПЭС useful supply, and forecast uncertainty."
 )
+if fallback_mode:
+    st.error(
+        "Fallback data mode is active. Core national indicators are based on packaged starter data because the "
+        "live national electricity source was unavailable. Security scores and recommendations are provisional, "
+        "and the executive PDF export is disabled."
+    )
 
 if dashboard_section == "Executive Overview":
     st.subheader("Current electricity situation")
@@ -151,45 +167,31 @@ if dashboard_section == "Executive Overview":
         "This page does not include forecast-driven scores or recommendations.</p>",
         unsafe_allow_html=True,
     )
-    metric_cols = st.columns(5)
-    metric_cols[0].metric("Production", f"{latest['production_twh']:.1f} TWh")
-    metric_cols[1].metric("Consumption", f"{latest['consumption_twh']:.1f} TWh")
-    metric_cols[2].metric("Domestic deficit", f"{latest['domestic_gap_twh']:.1f} TWh")
-    metric_cols[3].metric("Net imports", f"{latest['net_imports_twh']:.1f} TWh")
-    metric_cols[4].metric("Balance after trade", f"{latest['net_balance_twh']:.2f} TWh")
+    context_cols = st.columns(3)
+    context_cols[0].metric("Data year", int(latest["year"]))
+    context_cols[1].metric("Source status", source_status_label)
+    context_cols[2].metric("Loaded at", source_load_time)
 
-    st.subheader("How to read these indicators")
-    overview_explanations = pd.DataFrame(
-        [
+    metric_cols = st.columns(5)
+    metric_cols[0].metric("Production", f"{latest['production_twh']:.1f} TWh", f"{changes['production_yoy_pct']:+.1f}% YoY")
+    metric_cols[1].metric("Consumption", f"{latest['consumption_twh']:.1f} TWh", f"{changes['demand_yoy_pct']:+.1f}% YoY")
+    metric_cols[2].metric("Domestic gap", f"{latest['domestic_gap_twh']:+.1f} TWh")
+    metric_cols[3].metric("Net imports", f"{latest['net_imports_twh']:.1f} TWh")
+    metric_cols[4].metric("Balance after trade", f"{latest['net_balance_twh']:+.2f} TWh")
+    st.info(changes_summary)
+
+    with st.expander("Indicator definitions"):
+        overview_explanations = pd.DataFrame(
             [
-                "Production",
-                "Electricity generated domestically during the latest year.",
-                "Shows the scale of domestic supply available to meet demand.",
+                ["Production", "Electricity generated domestically during the latest year."],
+                ["Consumption", "Total national electricity demand or final consumption."],
+                ["Domestic gap", "Production minus consumption before imports and exports."],
+                ["Net imports", "Electricity imports minus electricity exports."],
+                ["Balance after trade", "Production plus imports minus consumption and exports."],
             ],
-            [
-                "Consumption",
-                "Total national electricity demand or final consumption.",
-                "Shows how much electricity the system needs to serve.",
-            ],
-            [
-                "Domestic deficit",
-                "Production minus consumption before imports and exports.",
-                "A negative value shows how much demand is not covered by domestic generation alone.",
-            ],
-            [
-                "Net imports",
-                "Electricity imports minus electricity exports.",
-                "Shows how much the national balance relies on electricity trade.",
-            ],
-            [
-                "Balance after trade",
-                "Production plus imports minus consumption and exports.",
-                "Shows whether recorded supply and trade balance recorded demand.",
-            ],
-        ],
-        columns=["Indicator", "What it means", "Why it matters"],
-    )
-    st.dataframe(overview_explanations, width="stretch", hide_index=True)
+            columns=["Indicator", "Definition"],
+        )
+        st.dataframe(overview_explanations, width="stretch", hide_index=True)
     st.caption(
         f"Latest available national year: {int(latest['year'])}. "
         "Values reflect the currently loaded public or fallback national dataset."
@@ -198,9 +200,8 @@ if dashboard_section == "Executive Overview":
 elif dashboard_section == "Energy Security Assessment":
     st.subheader("Energy Security Assessment")
     st.markdown(
-        '<p class="section-note">The Security Index combines current electricity conditions with future demand '
-        "assumptions. Change the forecast scenario or horizon below to see how the assessment responds, using "
-        "the unchanged forecasting and Security Index methods.</p>",
+        '<p class="section-note">The Security Index combines current electricity conditions with a fixed 12-month '
+        "demand assessment. Forecast horizon changes chart display only and does not change the assessment window.</p>",
         unsafe_allow_html=True,
     )
     control_left, control_right = st.columns(2)
@@ -221,9 +222,14 @@ elif dashboard_section == "Energy Security Assessment":
         months=assessment_months,
         scenario=assessment_scenario,
     )
-    assessment_peaks = peak_demand_summary(assessment_forecast)
-    security = calculate_security_index(national_df, assessment_forecast)
-    security_breakdown = security_index_breakdown(national_df, assessment_forecast)
+    assessment_index_forecast = forecast_demand(
+        national_df,
+        months=12,
+        scenario=assessment_scenario,
+    )
+    assessment_peaks = peak_demand_summary(assessment_index_forecast)
+    security = calculate_security_index(national_df, assessment_index_forecast)
+    security_breakdown = security_index_breakdown(national_df, assessment_index_forecast)
     rules = evaluate_policy_rules(national_df, security)
     briefing = situation_briefing(security, rules, changes)
     actions = recommended_actions(
@@ -234,12 +240,12 @@ elif dashboard_section == "Energy Security Assessment":
     )
     summary_text = executive_summary(
         national_df,
-        assessment_forecast,
+        assessment_index_forecast,
         assessment_scenario,
         security,
     )
     assessment_scenario_outputs = {
-        name: forecast_demand(national_df, months=assessment_months, scenario=name)
+        name: forecast_demand(national_df, months=12, scenario=name)
         for name in SCENARIOS
     }
     scenario_impacts, scenario_impact_summary = scenario_impact_analysis(
@@ -261,10 +267,17 @@ elif dashboard_section == "Energy Security Assessment":
     )
 
     st.info(
-        f"Current assessment uses the {assessment_scenario.lower()} assumption over a "
-        f"{assessment_months}-month forecast horizon. The Security Index reserve-margin component "
-        "uses up to the first 12 forecast months."
+        f"Charts use the selected {assessment_months}-month horizon. The Security Index always uses a fixed "
+        f"12-month {assessment_scenario.lower()} demand forecast. Scenario hydropower multipliers affect the "
+        "scenario balance estimate, not the Index production input."
     )
+    if fallback_mode:
+        st.warning(
+            "Provisional assessment: the live national electricity source is unavailable, so the score and "
+            "recommendations below are calculated from packaged fallback data."
+        )
+    with st.expander("View selected-horizon demand forecast"):
+        st.plotly_chart(forecast_chart(assessment_forecast), width="stretch")
 
     st.subheader("Current Security Assessment")
     assessment_cols = st.columns([0.9, 1.4])
@@ -323,8 +336,9 @@ elif dashboard_section == "Energy Security Assessment":
 
     st.subheader("Scenario Sensitivity Analysis")
     st.caption(
-        f"Comparison holds the forecast horizon at {assessment_months} months and changes only the existing "
-        "Dry, Normal, and Wet year assumptions. This shows how future assumptions influence the Security Index."
+        "All scenarios use the same fixed 12-month assessment window. Hydropower availability changes the "
+        "scenario balance estimate but is not substituted into the Security Index production input; score "
+        "differences reflect the scenario demand multipliers."
     )
     sensitivity_cols = st.columns(3)
     for column, (_, scenario_row) in zip(sensitivity_cols, scenario_impacts.iterrows()):
@@ -355,6 +369,8 @@ elif dashboard_section == "Energy Security Assessment":
         briefing_pdf,
         file_name="kyrgyzstan_energy_situation_briefing.pdf",
         mime="application/pdf",
+        disabled=fallback_mode,
+        help="Disabled while packaged fallback national data is active." if fallback_mode else None,
     )
 
 elif dashboard_section == "Policy Rules":
@@ -421,7 +437,7 @@ elif dashboard_section == "Regional Planning":
         "oblast boundaries. The official source reports Osh as one Ошское ПЭС territory and does not publish a "
         "separate Osh City value."
     )
-    with st.expander("Data sources, quality, and confidence notes", expanded=True):
+    with st.expander("Data sources, quality, and confidence notes"):
         st.markdown(
             f"""
             - **Official useful supply:** The Kyrgyz Electricity Settlement Center's *Brief electricity balance
@@ -456,28 +472,16 @@ elif dashboard_section == "Regional Planning":
             "for broad planning context because mapped administrative populations may not exactly match network "
             "boundaries. Production, losses, surplus/deficit, and risk ranking remain unavailable."
         )
-    map_df = regional_df.copy()
-    map_df["marker_size"] = (map_df["useful_supply_gwh"] / map_df["useful_supply_gwh"].max() * 28 + 8).round(1)
-    map_df["color"] = "#2563eb"
-    st.map(map_df, latitude="lat", longitude="lon", size="marker_size", color="color")
-
+    st.markdown("### Official useful supply")
     st.plotly_chart(regional_bar_chart(regional_df), width="stretch")
-    regional_table = regional_df[
+    official_table = regional_df[
             [
                 "region",
                 "source_region_label",
                 "territory_type",
                 "year",
                 "useful_supply_gwh",
-                "population",
-                "demand_per_capita_kwh",
-                "demand_share_pct",
-                "production_data_quality",
-                "distribution_losses_data_quality",
-                "balance_data_quality",
                 "useful_supply_data_quality",
-                "demand_per_capita_data_quality",
-                "demand_share_data_quality",
                 "source_document",
                 "data_provenance",
                 "source_url",
@@ -489,25 +493,43 @@ elif dashboard_section == "Regional Planning":
                 "territory_type": "Territory type",
                 "year": "Source year",
                 "useful_supply_gwh": "Useful supply (GWh)",
-                "population": "Population",
-                "demand_per_capita_kwh": "Derived supply per capita (kWh)",
-                "demand_share_pct": "Derived share of national demand (%)",
-                "production_data_quality": "Production",
-                "distribution_losses_data_quality": "Losses",
-                "balance_data_quality": "Balance",
-                "useful_supply_data_quality": "Supply quality",
-                "demand_per_capita_data_quality": "Per-capita quality",
-                "demand_share_data_quality": "Demand-share quality",
+                "useful_supply_data_quality": "Data quality",
                 "source_document": "Source document",
                 "data_provenance": "Data provenance",
                 "source_url": "Source URL",
             }
         )
-    st.dataframe(
-        regional_table,
-        width="stretch",
-        hide_index=True,
+    st.dataframe(official_table, width="stretch", hide_index=True)
+
+    st.markdown("### Derived planning context")
+    st.caption(
+        "These indicators combine official useful supply with mapped official population or the loaded national "
+        "demand series. They are planning comparisons, not official ПЭС balance statistics."
     )
+    derived_table = regional_df[
+            [
+                "region",
+                "population",
+                "demand_per_capita_kwh",
+                "demand_share_pct",
+                "demand_per_capita_data_quality",
+                "demand_share_data_quality",
+            ]
+        ].rename(
+            columns={
+                "region": "ПЭС territory",
+                "population": "Population",
+                "demand_per_capita_kwh": "Derived supply per capita (kWh)",
+                "demand_share_pct": "Derived share of national demand (%)",
+                "demand_per_capita_data_quality": "Per-capita quality",
+                "demand_share_data_quality": "Demand-share quality",
+            }
+        )
+    st.dataframe(derived_table, width="stretch", hide_index=True)
+
+    with st.expander("Territory reference map"):
+        st.caption("Reference points only — not service-area boundaries.")
+        st.plotly_chart(regional_reference_map(regional_df), width="stretch")
     st.caption(
         f"Official 2024 useful supply through the eight ПЭС networks totals "
         f"{regional_df['useful_supply_gwh'].sum():,.1f} GWh and represents "
@@ -516,7 +538,7 @@ elif dashboard_section == "Regional Planning":
     )
 
 elif dashboard_section == "Scenario Planning":
-    st.subheader("Forecast uncertainty and peak demand")
+    st.subheader("Forecast uncertainty and monthly energy")
     st.markdown(
         '<p class="section-note">Forecast charts use the standard Normal-year, 18-month planning baseline. '
         "Interactive Forecast Scenario and Forecast Horizon controls are available on the Energy Security Assessment page. "
@@ -530,17 +552,18 @@ elif dashboard_section == "Scenario Planning":
     peaks = baseline_peaks
     scenario_forecasts = baseline_scenario_forecasts
     peak_cols = st.columns(3)
-    peak_cols[0].metric("Winter peak demand", f"{peaks['winter_peak_twh']:.2f} TWh")
-    peak_cols[1].metric("Summer peak demand", f"{peaks['summer_peak_twh']:.2f} TWh")
+    peak_cols[0].metric("Highest winter month", f"{peaks['winter_peak_twh']:.2f} TWh")
+    peak_cols[1].metric("Highest summer month", f"{peaks['summer_peak_twh']:.2f} TWh")
     peak_cols[2].metric("Forecast demand", f"{future['forecast_twh'].sum():.1f} TWh")
     st.plotly_chart(forecast_chart(forecast_df), width="stretch")
     st.plotly_chart(scenario_spread_chart(scenario_forecasts), width="stretch")
 
     st.subheader("Scenario Impact Analysis")
     st.caption(
-        "Side-by-side comparison uses up to the first 12 forecast months, matching the unchanged "
+        "Side-by-side comparison uses a fixed 12-month forecast window, matching the "
         "Security Index calculation. The balance estimate prorates current generation and trade to "
-        "the comparison period and adjusts hydropower using each scenario's existing availability index."
+        "the comparison period and adjusts hydropower using each scenario's availability index. The Security "
+        "Index does not use scenario-adjusted production; its scenario differences come from forecast demand."
     )
     st.dataframe(scenario_impacts, width="stretch", hide_index=True)
     st.info(scenario_impact_summary)
@@ -581,7 +604,8 @@ elif dashboard_section == "Methodology":
         - **Production coverage:** compares current domestic production with current consumption. Full points require production equal to 105% of consumption.
         - **Hydropower dependency:** full points apply up to a 55% hydro share; the score falls as dependence rises above that level.
         - **Demand growth:** uses average recent annual consumption growth. Faster growth lowers the contribution.
-        - **Forecast reserve margin:** compares current annual production with demand forecast over up to the next 12 months.
+        - **Forecast reserve margin:** compares current annual production with a fixed 12-month demand forecast.
+        - **Assessment window:** the Security Index always uses 12 forecast months. The display horizon does not alter the score.
         - **Risk labels:** Secure is 75 or higher; Moderate Risk is 50–74.9; High Risk is below 50.
         """
     )
@@ -611,7 +635,8 @@ elif dashboard_section == "Methodology":
         """
         - If the statistical model cannot be fitted, the dashboard uses a seasonal average with a simple trend.
         - Confidence bands use forecast residual variation and are planning ranges, not guaranteed limits.
-        - Scenario Impact Analysis uses the same forecast outputs and unchanged Security Index calculation.
+        - Scenario hydropower multipliers affect the scenario balance estimate, not the Security Index production input.
+        - Security Index differences across Dry, Normal, and Wet scenarios therefore reflect demand multipliers only.
         - Monthly forecasts should be recalibrated when observed monthly demand, reservoir, weather, outage, and plant-availability data become available.
         """
     )
@@ -622,7 +647,7 @@ elif dashboard_section == "Methodology":
         - **Our World in Data:** available annual national electricity generation, demand, hydropower, thermal generation, trade, and population fields.
         - **World Bank:** electricity access and population indicators where available.
         - **National Statistical Committee:** official regional population estimates used in the regional planning layer.
-        - **Packaged fallback:** if national public endpoints fail, starter national data keeps the application usable.
+        - **Packaged fallback:** if the core national source fails, starter national data keeps the application usable, but a page-level warning is shown and PDF export is disabled.
         - **Kyrgyz Electricity Settlement Center:** official 2024 useful electricity supply by ПЭС service territory.
         """
     )

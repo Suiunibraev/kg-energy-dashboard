@@ -9,11 +9,11 @@ The regional layer uses the Settlement Center's official 2024 annual useful-supp
 ## How To Use It
 
 1. Open the dashboard URL.
-2. Use the year range selector to choose the period you want to review.
-3. Review the top summary numbers for production, consumption, hydro share, and surplus or deficit.
-4. Use the national charts to compare production and consumption over time.
-5. Use the regional tab to compare useful electricity supply across ПЭС service territories and review source provenance.
-6. Open the forecast tab to see expected seasonal demand and choose a dry, normal, or wet hydropower scenario.
+2. Start with Executive Overview to confirm the data year, source status, load time, and latest factual indicators.
+3. Use National Monitoring to choose a historical period and compare production and consumption.
+4. Use Regional Planning to rank official useful supply across ПЭС service territories and review provenance.
+5. Use Energy Security Assessment to compare Dry, Normal, and Wet planning assumptions.
+6. Use Scenario Planning to review monthly energy forecasts; these are monthly TWh projections, not instantaneous MW peaks.
 
 ## What Staff Can Learn
 
@@ -21,7 +21,7 @@ The regional layer uses the Settlement Center's official 2024 annual useful-supp
 - Whether imports and exports bring the overall electricity balance closer to zero.
 - Which ПЭС service territories have the highest official useful supply.
 - Which regional production and loss fields still require official data.
-- How seasonal demand may change under different water-year conditions.
+- How monthly electricity energy may change under different planning assumptions.
 
 ## How The Ministry Can Expand It
 
@@ -32,8 +32,10 @@ The Ministry can connect internal data without rebuilding the dashboard. The dat
   network-input, and distribution-loss data.
 - Optional future upgrades: monthly demand, reservoir levels, inflows, temperature, plant availability, and planned maintenance.
 
-With official Ministry data, the forecast can become more accurate and the regional map can become an operational monitoring tool.
+With official Ministry data, forecasts can become more accurate and regional analysis can expand only when compatible official fields are available.
 
 ## Practical Note
 
-Forecasts should support planning discussions. They should not replace engineering judgment, dispatch procedures, or official Ministry reporting.
+The Security Index always uses a fixed 12-month forecast assessment window. Dry and Wet hydropower multipliers affect the scenario balance estimate, but they do not replace current production inside the Index; scenario score differences therefore reflect demand assumptions. If packaged fallback national data is active, the dashboard shows a prominent warning and disables the executive PDF.
+
+Forecasts should support planning discussions. They should not replace engineering judgment, dispatch procedures, procurement methodology, or official Ministry reporting.

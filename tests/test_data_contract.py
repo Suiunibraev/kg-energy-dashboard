@@ -1,10 +1,19 @@
-from energy_dashboard.data_sources import add_regional_planning_metrics, load_energy_dataset, load_regional_dataset
+import pytest
+
+from energy_dashboard.data_sources import (
+    SourceStatus,
+    add_regional_planning_metrics,
+    load_energy_dataset,
+    load_regional_dataset,
+    national_data_mode,
+)
 from energy_dashboard.forecasting import forecast_demand
 from energy_dashboard.policy import (
     calculate_security_index,
     evaluate_policy_rules,
     peak_demand_summary,
     recommended_actions,
+    security_index_breakdown,
 )
 
 
@@ -52,6 +61,8 @@ def test_regional_data_contract():
     assert regional["data_quality"].eq("Official").all()
     assert regional["data_provenance"].str.len().gt(0).all()
     assert regional["source_url"].str.startswith("https://esep.energo.kg/").all()
+    assert regional["source_organization"].eq("Kyrgyz Electricity Settlement Center").all()
+    assert regional["metric"].eq("Useful electricity supply through PES networks").all()
     assert abs(regional["useful_supply_gwh"].sum() - 12_597.767126) < 1e-6
     assert "consumption_gwh" not in regional.columns
     assert "Osh service territory" in set(regional["region"])
@@ -106,6 +117,38 @@ def test_security_index_contract():
     assert {"production_coverage_pct", "hydro_share_pct", "reserve_margin_pct"}.issubset(security)
 
 
+def test_security_index_uses_fixed_twelve_month_window():
+    national, _ = load_energy_dataset()
+    national["net_imports_twh"] = national["imports_twh"] - national["exports_twh"]
+    forecast_12 = forecast_demand(national, months=12, scenario="Normal year")
+    forecast_18 = forecast_demand(national, months=18, scenario="Normal year")
+
+    security_12 = calculate_security_index(national, forecast_12)
+    security_18 = calculate_security_index(national, forecast_18)
+    assert security_12 == security_18
+
+    breakdown = security_index_breakdown(national, forecast_18)
+    assert round(breakdown["score"].sum(), 1) == security_18["score"]
+
+    forecast_6 = forecast_demand(national, months=6, scenario="Normal year")
+    with pytest.raises(ValueError, match="fixed 12-month"):
+        calculate_security_index(national, forecast_6)
+
+
+def test_national_data_mode_distinguishes_fallback():
+    live_statuses = [
+        SourceStatus("Our World in Data", "live", "ok", "2026-01-01 00:00 UTC"),
+        SourceStatus("World Bank", "fallback", "unavailable", "2026-01-01 00:00 UTC"),
+    ]
+    fallback_statuses = [
+        SourceStatus("Our World in Data", "fallback", "unavailable", "2026-01-01 00:00 UTC"),
+        SourceStatus("World Bank", "live", "ok", "2026-01-01 00:00 UTC"),
+    ]
+    assert national_data_mode(live_statuses) == "live"
+    assert national_data_mode(fallback_statuses) == "fallback"
+    assert national_data_mode([]) == "fallback"
+
+
 def test_policy_rules_contract():
     national, _ = load_energy_dataset()
     national["net_imports_twh"] = national["imports_twh"] - national["exports_twh"]
@@ -130,3 +173,4 @@ def test_actions_do_not_use_unavailable_regional_risk():
     action_text = " ".join(actions["Recommended action"].astype(str)).lower()
     assert "highest-risk region" not in action_text
     assert "loss reduction in" not in action_text
+    assert "covering at least" not in action_text

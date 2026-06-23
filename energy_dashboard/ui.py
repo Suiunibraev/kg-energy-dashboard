@@ -448,6 +448,77 @@ def regional_bar_chart(regional: pd.DataFrame) -> go.Figure:
     return fig
 
 
+def regional_reference_map(regional: pd.DataFrame) -> go.Figure:
+    """Map official ПЭС useful-supply reference points with auditable hover detail."""
+    mapped = regional.copy()
+    reported_total = float(mapped["useful_supply_gwh"].sum())
+    mapped["reported_supply_share_pct"] = (
+        mapped["useful_supply_gwh"] / reported_total * 100 if reported_total > 0 else 0
+    )
+    mapped["population_display"] = mapped["population"].map(
+        lambda value: f"{value:,.0f}" if pd.notna(value) else "Not available"
+    )
+    mapped["per_capita_display"] = mapped["demand_per_capita_kwh"].map(
+        lambda value: f"{value:,.0f} kWh" if pd.notna(value) else "Not available"
+    )
+    mapped["supply_share_display"] = mapped["reported_supply_share_pct"].map(
+        lambda value: f"{value:.1f}%" if pd.notna(value) else "Not available"
+    )
+    mapped["quality_provenance"] = (
+        mapped["useful_supply_data_quality"].fillna(mapped["data_quality"]).fillna("Not available")
+        + " — "
+        + mapped["data_provenance"].fillna("Provenance not available")
+    )
+
+    maximum = float(mapped["useful_supply_gwh"].max())
+    marker_sizes = mapped["useful_supply_gwh"] / maximum * 34 + 10 if maximum > 0 else 14
+    customdata = mapped[
+        [
+            "source_region_label",
+            "region",
+            "population_display",
+            "per_capita_display",
+            "supply_share_display",
+            "quality_provenance",
+        ]
+    ].to_numpy()
+
+    fig = go.Figure(
+        go.Scattermapbox(
+            lat=mapped["lat"],
+            lon=mapped["lon"],
+            mode="markers",
+            marker={
+                "size": marker_sizes,
+                "color": mapped["useful_supply_gwh"],
+                "colorscale": [[0, "#93c5fd"], [1, PALETTE["blue"]]],
+                "showscale": True,
+                "colorbar": {"title": "GWh", "thickness": 12},
+                "opacity": 0.82,
+                "sizemode": "diameter",
+            },
+            customdata=customdata,
+            hovertemplate=(
+                "<b>ПЭС service territory:</b> %{customdata[0]}<br>"
+                "<b>Dashboard region:</b> %{customdata[1]}<br>"
+                "<b>Official useful supply:</b> %{marker.color:,.1f} GWh<br>"
+                "<b>Population:</b> %{customdata[2]}<br>"
+                "<b>Useful supply per capita:</b> %{customdata[3]}<br>"
+                "<b>Share of reported national ПЭС useful supply:</b> %{customdata[4]}<br>"
+                "<b>Data quality / provenance:</b> %{customdata[5]}"
+                "<extra></extra>"
+            ),
+        )
+    )
+    fig.update_layout(
+        mapbox={"style": "open-street-map", "center": {"lat": 41.4, "lon": 74.6}, "zoom": 5.2},
+        margin={"l": 0, "r": 0, "t": 10, "b": 0},
+        height=470,
+        showlegend=False,
+    )
+    return fig
+
+
 def forecast_chart(forecast: pd.DataFrame) -> go.Figure:
     observed = forecast[forecast["period"].eq("Observed")]
     future = forecast[forecast["period"].eq("Forecast")]

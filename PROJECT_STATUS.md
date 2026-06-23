@@ -74,6 +74,18 @@ runtime.txt
 
 ## Completed Features
 
+### Version 1 credibility pass
+
+- Security Index reserve margin uses a fixed 12-month assessment window.
+- Forecast horizon controls chart display only.
+- Scenario hydropower multipliers are disclosed as affecting balance estimates, not the Index production input.
+- Monthly TWh maxima are labeled as highest-energy months rather than peak demand.
+- Procurement recommendations are planning-oriented and contain no unsupported contract quantity.
+- Executive Overview shows data year, source state, load time, and recent factual context.
+- Regional Planning leads with official useful-supply ranking, separates derived metrics, and demotes the map to labeled reference points.
+- Core national fallback mode triggers a prominent warning, provisional assessment notice, and disabled PDF export.
+- Methodology, fallback-state, and official regional dataset contracts have focused automated tests.
+
 ### Current national monitoring
 
 - Electricity production and consumption
@@ -128,7 +140,7 @@ The page explicitly states that the Security Index combines current conditions w
 ### Scenario planning
 
 - Forecast-demand chart with confidence band
-- Winter and summer peak indicators
+- Highest winter- and summer-month energy indicators
 - Scenario-spread chart
 - Dry, Normal, and Wet scenario comparison
 - Forecast table
@@ -220,7 +232,7 @@ The Energy Security Index is an explainable 0–100 policy prototype implemented
 | Production coverage | 35 | Current production-to-consumption ratio; full points at 105% coverage |
 | Hydropower dependency | 20 | Full points up to 55% hydro share, declining as reliance rises |
 | Recent demand growth | 20 | Uses average recent annual consumption growth; faster growth lowers the score |
-| Forecast reserve margin | 25 | Compares current annual production with up to the first 12 forecast months |
+| Forecast reserve margin | 25 | Compares current annual production with a fixed 12-month demand forecast |
 
 ### Formula summary
 
@@ -302,7 +314,9 @@ SCENARIOS = {
 }
 ```
 
-The Security Index reserve-margin component uses up to the first 12 forecast months, even when the selected display horizon is longer. This behavior is unchanged and is explained in the UI.
+The Security Index reserve-margin component always uses a fixed 12-month forecast. The selected forecast horizon controls chart display only and no longer changes the score when set below 12 months.
+
+Dry, Normal, and Wet hydropower multipliers affect the scenario balance estimate but are not substituted into the Security Index production input. Security Index differences across scenarios therefore reflect the demand multipliers. This limitation is stated in the UI, methodology page, PDF, and project documentation.
 
 ## Regional Planning Layer Status
 
@@ -360,7 +374,7 @@ Population values are official public estimates from the National Statistical Co
 Official useful supply totals 12,597.767126 GWh across the eight published ПЭС
 rows. Production, distribution losses, balance, status, and regional risk are
 not estimated. Their compatibility fields are null or marked `Not available`.
-The previous demonstration regional CSV is no longer loaded.
+Only the official ПЭС useful-supply CSV is loaded for the regional layer.
 
 ## Known Limitations
 
@@ -369,6 +383,7 @@ The previous demonstration regional CSV is no longer loaded.
 - Public national electricity data is annual and country-level.
 - Public endpoints can fail or revise historical values.
 - Fallback national data is starter data, not official operational data.
+- When the core national source is in fallback mode, the app displays a page-level warning, marks assessments as provisional, and disables executive PDF export.
 - “Loaded at” timestamps are request times, not source-publication dates.
 - ПЭС territories may not exactly match administrative oblast boundaries.
 - Official regional production and distribution-loss data remain unavailable.
@@ -389,6 +404,7 @@ The previous demonstration regional CSV is no longer loaded.
 - Security Index weights and thresholds are prototypes.
 - Recommended actions are simplified rule-based prompts.
 - Scenario net-balance estimates use current generation/trade values and scenario hydropower indices.
+- Scenario hydropower indices do not alter the Security Index production input.
 - Risk labels are decision-support signals, not official determinations.
 
 ### Regional analysis
@@ -433,7 +449,6 @@ The previous demonstration regional CSV is no longer loaded.
 ### Testing
 
 - Add focused automated tests for:
-  - Security Index breakdown summing to the unchanged total
   - Scenario Impact Analysis
   - Year-over-year summary selection
   - Recommended-action evidence
@@ -441,6 +456,7 @@ The previous demonstration regional CSV is no longer loaded.
   - Empty or malformed regional data
   - Failed public-source loads
   - PDF content and page count
+- Completed focused tests cover the fixed 12-month assessment window, Security Index breakdown equality, fallback-mode classification, non-prescriptive recommendation wording, and official ПЭС dataset provenance.
 - Run the full pytest suite in a repeatable development environment.
 
 ### Product and deployment
