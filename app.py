@@ -71,6 +71,16 @@ def ensure_national_metrics(national: pd.DataFrame) -> pd.DataFrame:
     return national
 
 
+def forecast_period_context(forecast: pd.DataFrame) -> tuple[str, bool]:
+    future = forecast[forecast["period"].eq("Forecast")]
+    if future.empty:
+        return "Forecast period not available", False
+    start = pd.Timestamp(future["date"].min())
+    end = pd.Timestamp(future["date"].max())
+    current_month = pd.Timestamp.today().to_period("M").to_timestamp()
+    return f"{start:%B %Y} to {end:%B %Y}", start < current_month
+
+
 def stop_with_data_error(exc: Exception) -> None:
     st.error(
         "The dashboard could not load the required energy data. "
@@ -130,6 +140,7 @@ source_load_time = national_source_status.last_updated if national_source_status
 baseline_scenario = "Normal year"
 baseline_months = 18
 baseline_forecast = forecast_demand(national_df, months=baseline_months, scenario=baseline_scenario)
+baseline_forecast_period, baseline_period_has_elapsed = forecast_period_context(baseline_forecast)
 baseline_peaks = peak_demand_summary(baseline_forecast)
 security = calculate_security_index(national_df, baseline_forecast)
 security_breakdown = security_index_breakdown(national_df, baseline_forecast)
@@ -172,12 +183,11 @@ if dashboard_section == "Executive Overview":
     context_cols[1].metric("Source status", source_status_label)
     context_cols[2].metric("Loaded at", source_load_time)
 
-    metric_cols = st.columns(5)
+    metric_cols = st.columns(4)
     metric_cols[0].metric("Production", f"{latest['production_twh']:.1f} TWh", f"{changes['production_yoy_pct']:+.1f}% YoY")
     metric_cols[1].metric("Consumption", f"{latest['consumption_twh']:.1f} TWh", f"{changes['demand_yoy_pct']:+.1f}% YoY")
     metric_cols[2].metric("Domestic gap", f"{latest['domestic_gap_twh']:+.1f} TWh")
     metric_cols[3].metric("Net imports", f"{latest['net_imports_twh']:.1f} TWh")
-    metric_cols[4].metric("Balance after trade", f"{latest['net_balance_twh']:+.2f} TWh")
     st.info(changes_summary)
 
     with st.expander("Indicator definitions"):
@@ -187,7 +197,6 @@ if dashboard_section == "Executive Overview":
                 ["Consumption", "Total national electricity demand or final consumption."],
                 ["Domestic gap", "Production minus consumption before imports and exports."],
                 ["Net imports", "Electricity imports minus electricity exports."],
-                ["Balance after trade", "Production plus imports minus consumption and exports."],
             ],
             columns=["Indicator", "Definition"],
         )
@@ -222,6 +231,7 @@ elif dashboard_section == "Energy Security Assessment":
         months=assessment_months,
         scenario=assessment_scenario,
     )
+    assessment_forecast_period, assessment_period_has_elapsed = forecast_period_context(assessment_forecast)
     assessment_index_forecast = forecast_demand(
         national_df,
         months=12,
@@ -267,10 +277,16 @@ elif dashboard_section == "Energy Security Assessment":
     )
 
     st.info(
-        f"Charts use the selected {assessment_months}-month horizon. The Security Index always uses a fixed "
+        f"Charted model projection: {assessment_forecast_period}, following the latest annual data year. "
+        f"The selected horizon is {assessment_months} months. The Security Index always uses a fixed "
         f"12-month {assessment_scenario.lower()} demand forecast. Scenario hydropower multipliers affect the "
         "scenario balance estimate, not the Index production input."
     )
+    if assessment_period_has_elapsed:
+        st.warning(
+            "Part of this modeled period has already elapsed. These months remain in the chart because the "
+            "projection is anchored to the latest complete annual data year; they are not current observations."
+        )
     if fallback_mode:
         st.warning(
             "Provisional assessment: the live national electricity source is unavailable, so the score and "
@@ -385,7 +401,8 @@ elif dashboard_section == "Policy Rules":
 elif dashboard_section == "National Monitoring":
     st.subheader("National electricity trends")
     st.markdown(
-        '<p class="section-note">Compare production, consumption, hydropower reliance, the domestic production gap, and the net balance after electricity trade.</p>',
+        '<p class="section-note">Compare production, consumption, hydropower reliance, the domestic production gap, '
+        "and electricity trade. The detailed table also retains the accounting reconciliation residual.</p>",
         unsafe_allow_html=True,
     )
     year_min = int(national_df["year"].min())
@@ -406,24 +423,29 @@ elif dashboard_section == "National Monitoring":
     st.plotly_chart(trade_chart(filtered), width="stretch")
 
     with st.expander("View national data table"):
+        national_table = filtered[
+            [
+                "year",
+                "production_twh",
+                "consumption_twh",
+                "hydro_twh",
+                "thermal_twh",
+                "imports_twh",
+                "exports_twh",
+                "net_imports_twh",
+                "domestic_gap_twh",
+                "net_balance_twh",
+                "hydro_share_pct",
+            ]
+        ].rename(columns={"net_balance_twh": "accounting_reconciliation_residual_twh"})
         st.dataframe(
-            filtered[
-                [
-                    "year",
-                    "production_twh",
-                    "consumption_twh",
-                    "hydro_twh",
-                    "thermal_twh",
-                    "imports_twh",
-                    "exports_twh",
-                    "net_imports_twh",
-                    "domestic_gap_twh",
-                    "net_balance_twh",
-                    "hydro_share_pct",
-                ]
-            ],
+            national_table,
             width="stretch",
             hide_index=True,
+        )
+        st.caption(
+            "Accounting reconciliation residual = production + imports − consumption − exports. Values near zero "
+            "are expected under the source accounting identity and do not indicate reserve adequacy or reliability."
         )
 
 elif dashboard_section == "Regional Planning":
@@ -437,15 +459,16 @@ elif dashboard_section == "Regional Planning":
         "oblast boundaries. The official source reports Osh as one Ошское ПЭС territory and does not publish a "
         "separate Osh City value."
     )
-    with st.expander("Data sources, quality, and confidence notes"):
+    with st.expander("Data sources, quality, and interpretation notes"):
         st.markdown(
             f"""
             - **Official useful supply:** The Kyrgyz Electricity Settlement Center's *Brief electricity balance
               for the Kyrgyz power system for 2024*, section 6.3, reports annual useful electricity supply by ПЭС.
               Values are converted from thousand kWh to GWh without estimation.
-            - **Official population:** Population estimates are from the
+            - **Official source / mapped population:** Population estimates are from the
               [National Statistical Committee of the Kyrgyz Republic]({REGIONAL_POPULATION_SOURCE_URL}),
-              reported for January 1, 2025 and used as the end-2024 population position.
+              reported for January 1, 2025 and used as the end-2024 population position. Administrative population
+              is mapped to ПЭС territory, so boundary alignment may be approximate.
             - **Derived:** Per-capita supply divides official ПЭС useful supply by the mapped official population.
               The Osh denominator combines Osh oblast and Osh City population because the electricity source reports
               one Ошское ПЭС value. Demand share divides ПЭС useful supply by the loaded national annual demand.
@@ -455,7 +478,11 @@ elif dashboard_section == "Regional Planning":
         )
         quality_rows = pd.DataFrame(
             [
-                ["Population", "Official", "Public regional population estimate at January 1, 2025."],
+                [
+                    "Population",
+                    "Official source / mapped",
+                    "Official administrative population mapped to ПЭС territory; boundary alignment may be approximate.",
+                ],
                 ["Useful electricity supply", "Official", "Settlement Center 2024 annual balance, section 6.3."],
                 ["Production", "Not available", "No official ПЭС production field is used."],
                 ["Distribution losses", "Not available", "No official ПЭС loss field is used."],
@@ -510,6 +537,7 @@ elif dashboard_section == "Regional Planning":
             [
                 "region",
                 "population",
+                "population_data_quality",
                 "demand_per_capita_kwh",
                 "demand_share_pct",
                 "demand_per_capita_data_quality",
@@ -519,6 +547,7 @@ elif dashboard_section == "Regional Planning":
             columns={
                 "region": "ПЭС territory",
                 "population": "Population",
+                "population_data_quality": "Population quality",
                 "demand_per_capita_kwh": "Derived supply per capita (kWh)",
                 "demand_share_pct": "Derived share of national demand (%)",
                 "demand_per_capita_data_quality": "Per-capita quality",
@@ -545,6 +574,14 @@ elif dashboard_section == "Scenario Planning":
         "Monthly patterns are estimated from annual data and should be recalibrated with official monthly demand, reservoir, weather, and plant availability data.</p>",
         unsafe_allow_html=True,
     )
+    st.info(
+        f"Model projection period: {baseline_forecast_period}, following the latest annual data year."
+    )
+    if baseline_period_has_elapsed:
+        st.warning(
+            "Part of this modeled period has already elapsed. These months are estimated model outputs, not "
+            "current observations."
+        )
     scenario = baseline_scenario
     months = baseline_months
     forecast_df = baseline_forecast
@@ -570,7 +607,7 @@ elif dashboard_section == "Scenario Planning":
 
     forecast_total = future["forecast_twh"].sum()
     st.info(
-        f"{scenario}: projected demand over the next {months} months is {forecast_total:.1f} TWh. "
+        f"{scenario}: projected demand for {baseline_forecast_period} is {forecast_total:.1f} TWh. "
         f"Hydropower availability index: {future['hydro_availability_index'].iloc[0]:.2f}."
     )
     with st.expander("View forecast table"):
@@ -589,6 +626,11 @@ elif dashboard_section == "Methodology":
     st.write(
         "The Energy Security Index is a 0–100 composite score. It adds four weighted components; "
         "a higher score indicates stronger security under the current data and forecast assumptions."
+    )
+    st.warning(
+        "Coverage concentration: production coverage and forecast reserve margin are related energy-coverage "
+        "measures and together account for 60 of 100 points. The prototype therefore primarily reflects energy "
+        "coverage, hydropower dependence, and demand pressure—not every dimension of electricity security."
     )
     methodology_index = security_breakdown[
         ["Component", "Weight", "Current indicator", "Why it changed the score"]
@@ -634,7 +676,8 @@ elif dashboard_section == "Methodology":
     st.markdown(
         """
         - If the statistical model cannot be fitted, the dashboard uses a seasonal average with a simple trend.
-        - Confidence bands use forecast residual variation and are planning ranges, not guaranteed limits.
+        - Displayed upper and lower model ranges are uncalibrated sensitivity bands derived from residual variation, not probabilistic confidence intervals.
+        - The monthly history is estimated from annual totals using fixed seasonal weights; it is not observed monthly demand.
         - Scenario hydropower multipliers affect the scenario balance estimate, not the Security Index production input.
         - Security Index differences across Dry, Normal, and Wet scenarios therefore reflect demand multipliers only.
         - Monthly forecasts should be recalibrated when observed monthly demand, reservoir, weather, outage, and plant-availability data become available.

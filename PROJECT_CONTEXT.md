@@ -59,7 +59,7 @@ The dashboard compares:
 - Electricity production
 - Electricity consumption
 - Domestic production gap before trade
-- Net balance after imports and exports
+- Accounting reconciliation residual after imports and exports
 - Net imports
 - Hydropower share
 - Generation mix by source
@@ -109,7 +109,7 @@ Forecast method:
   - multiplicative seasonality
   - 12-month seasonal period
 - If model fitting fails, the code falls back to a seasonal average plus simple trend.
-- Confidence bands use `1.64 * residual_std`.
+- Illustrative model ranges use `1.64 * residual_std`; they are uncalibrated sensitivity bands, not probabilistic confidence intervals.
 
 Known forecast caveat:
 
@@ -160,6 +160,8 @@ Index components:
 - Forecast reserve margin score: 25 points
 
 Current score should be treated as a policy prototype, not an official Ministry methodology.
+
+Production coverage and forecast reserve margin are related energy-coverage measures and together account for 60 of 100 points. The weights are unchanged, but this concentration is disclosed in the UI, PDF, and documentation.
 
 ### Time Intelligence
 
@@ -286,7 +288,7 @@ Current charts:
 - Scenario spread chart
 - Security gauge
 - Official ПЭС useful-supply bar chart
-- Forecast chart with confidence band
+- Forecast chart with illustrative upper and lower model ranges
 
 Hover definitions have been added to chart traces so users see metric meaning, not only values.
 
@@ -379,7 +381,7 @@ Current repo workflow:
 - Regional useful-supply data is official 2024 ПЭС service-territory data; production, losses, balance, and risk remain unavailable.
 - Public national data is annual and country-level; it is not enough for dispatch-grade planning.
 - Forecast monthly seasonality is estimated from annual data.
-- Confidence bands are statistical approximations, not calibrated probabilistic forecasts.
+- Model ranges are uncalibrated sensitivity bands, not probabilistic confidence intervals.
 - Energy Security Index weights and thresholds are prototype policy assumptions.
 - The Security Index always uses a fixed 12-month demand assessment window; chart horizon does not change the score.
 - Scenario hydropower multipliers affect scenario balance estimates but do not replace current production in the Security Index.
@@ -427,6 +429,11 @@ Portfolio polish:
 - Fixed the Security Index forecast assessment window at 12 months.
 - Added explicit fallback-mode warnings and disabled PDF export in fallback mode.
 - Renamed monthly forecast maxima to avoid implying instantaneous peak demand.
+- Renamed synthetic monthly history from Observed to Estimated monthly history.
+- Added exact forecast-period labels and warnings when part of the model period has elapsed.
+- Removed the accounting reconciliation residual from Executive Overview KPIs.
+- Reclassified regional population as Official source / mapped.
+- Disclosed that related energy-coverage components account for 60 of 100 Security Index points.
 
 ## Practical Notes For Future Sessions
 

@@ -2,6 +2,7 @@ import pytest
 
 from energy_dashboard.data_sources import (
     SourceStatus,
+    _fallback_national_data,
     add_regional_planning_metrics,
     load_energy_dataset,
     load_regional_dataset,
@@ -10,11 +11,13 @@ from energy_dashboard.data_sources import (
 from energy_dashboard.forecasting import forecast_demand
 from energy_dashboard.policy import (
     calculate_security_index,
+    executive_summary,
     evaluate_policy_rules,
     peak_demand_summary,
     recommended_actions,
     security_index_breakdown,
 )
+from energy_dashboard.ui import forecast_chart
 
 
 def test_national_data_contract():
@@ -88,7 +91,8 @@ def test_regional_data_contract():
         "risk_data_quality",
     }.issubset(planning.columns)
     assert planning["population"].notna().all()
-    assert planning["population_data_quality"].eq("Official").all()
+    assert planning["population_data_quality"].eq("Official source / mapped").all()
+    assert planning["population_alignment_note"].str.contains("boundary alignment may be approximate").all()
     assert planning["useful_supply_data_quality"].eq("Official").all()
     assert planning["production_data_quality"].eq("Not available").all()
     assert planning["distribution_losses_data_quality"].eq("Not available").all()
@@ -105,6 +109,26 @@ def test_forecast_contract():
     assert len(future) == 12
     assert (future["upper_twh"] >= future["forecast_twh"]).all()
     assert (future["lower_twh"] <= future["forecast_twh"]).all()
+
+
+def test_forecast_credibility_labels_preserve_numeric_output():
+    national = _fallback_national_data()
+    forecast = forecast_demand(national, months=12, scenario="Normal year")
+    future = forecast[forecast["period"].eq("Forecast")]
+    history = forecast[forecast["period"].eq("Estimated history")]
+
+    assert len(history) == 120
+    assert "Observed" not in set(forecast["period"])
+    assert future["forecast_twh"].sum() == pytest.approx(16.491413435686457)
+    assert future.iloc[0]["forecast_twh"] == pytest.approx(1.7356400545579889)
+
+    figure = forecast_chart(forecast)
+    trace_names = [trace.name for trace in figure.data]
+    assert "Estimated monthly history" in trace_names
+    assert "Illustrative upper model range" in trace_names
+    assert "Illustrative lower model range" in trace_names
+    assert not any("confidence" in (trace.name or "").lower() for trace in figure.data)
+    assert not any("likely" in (trace.name or "").lower() for trace in figure.data)
 
 
 def test_security_index_contract():
@@ -129,10 +153,24 @@ def test_security_index_uses_fixed_twelve_month_window():
 
     breakdown = security_index_breakdown(national, forecast_18)
     assert round(breakdown["score"].sum(), 1) == security_18["score"]
+    assert breakdown["weight"].tolist() == [35, 20, 20, 25]
 
     forecast_6 = forecast_demand(national, months=6, scenario="Normal year")
     with pytest.raises(ValueError, match="fixed 12-month"):
         calculate_security_index(national, forecast_6)
+
+
+def test_executive_summary_uses_exact_model_period():
+    national, _ = load_energy_dataset()
+    national["net_imports_twh"] = national["imports_twh"] - national["exports_twh"]
+    forecast = forecast_demand(national, months=12, scenario="Normal year")
+    security = calculate_security_index(national, forecast)
+    future = forecast[forecast["period"].eq("Forecast")]
+
+    summary = executive_summary(national, forecast, "Normal year", security)
+    expected_period = f"{future['date'].min():%B %Y} to {future['date'].max():%B %Y}"
+    assert expected_period in summary
+    assert "over the next 12 months" not in summary
 
 
 def test_national_data_mode_distinguishes_fallback():

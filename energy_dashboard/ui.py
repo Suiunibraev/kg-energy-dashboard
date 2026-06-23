@@ -477,9 +477,11 @@ def regional_reference_map(regional: pd.DataFrame) -> go.Figure:
             "source_region_label",
             "region",
             "population_display",
+            "population_data_quality",
             "per_capita_display",
             "supply_share_display",
             "quality_provenance",
+            "population_alignment_note",
         ]
     ].to_numpy()
 
@@ -503,9 +505,11 @@ def regional_reference_map(regional: pd.DataFrame) -> go.Figure:
                 "<b>Dashboard region:</b> %{customdata[1]}<br>"
                 "<b>Official useful supply:</b> %{marker.color:,.1f} GWh<br>"
                 "<b>Population:</b> %{customdata[2]}<br>"
-                "<b>Useful supply per capita:</b> %{customdata[3]}<br>"
-                "<b>Share of reported national ПЭС useful supply:</b> %{customdata[4]}<br>"
-                "<b>Data quality / provenance:</b> %{customdata[5]}"
+                "<b>Population quality:</b> %{customdata[3]}<br>"
+                "<b>Useful supply per capita:</b> %{customdata[4]}<br>"
+                "<b>Share of reported national ПЭС useful supply:</b> %{customdata[5]}<br>"
+                "<b>Supply quality / provenance:</b> %{customdata[6]}<br>"
+                "<b>Population alignment:</b> %{customdata[7]}"
                 "<extra></extra>"
             ),
         )
@@ -520,39 +524,39 @@ def regional_reference_map(regional: pd.DataFrame) -> go.Figure:
 
 
 def forecast_chart(forecast: pd.DataFrame) -> go.Figure:
-    observed = forecast[forecast["period"].eq("Observed")]
+    estimated_history = forecast[forecast["period"].eq("Estimated history")]
     future = forecast[forecast["period"].eq("Forecast")]
     fig = go.Figure()
     fig.add_trace(
         go.Scatter(
-            x=observed["date"],
-            y=observed["forecast_twh"],
-            name="Observed demand",
+            x=estimated_history["date"],
+            y=estimated_history["forecast_twh"],
+            name="Estimated monthly history",
             line=dict(color=PALETTE["ink"], width=2),
-            hovertemplate="<b>Month:</b> %{x|%b %Y}<br><b>Observed pattern:</b> %{y:.2f} TWh<extra>Monthly pattern estimated from annual data for planning use.</extra>",
+            hovertemplate="<b>Month:</b> %{x|%b %Y}<br><b>Estimated monthly history:</b> %{y:.2f} TWh<extra>Monthly values allocated from annual data using fixed seasonal weights; not observed monthly data.</extra>",
         )
     )
     fig.add_trace(
         go.Scatter(
             x=future["date"],
             y=future["upper_twh"],
-            name="Upper range",
+            name="Illustrative upper model range",
             mode="lines",
             line=dict(width=0),
             showlegend=False,
-            hovertemplate="<b>Month:</b> %{x|%b %Y}<br><b>Upper range:</b> %{y:.2f} TWh<extra>Upper confidence range around the forecast.</extra>",
+            hovertemplate="<b>Month:</b> %{x|%b %Y}<br><b>Illustrative upper model range:</b> %{y:.2f} TWh<extra>Uncalibrated model range derived from residual variation; not a probabilistic confidence interval.</extra>",
         )
     )
     fig.add_trace(
         go.Scatter(
             x=future["date"],
             y=future["lower_twh"],
-            name="Likely range",
+            name="Illustrative lower model range",
             mode="lines",
             fill="tonexty",
             fillcolor="rgba(37, 99, 235, 0.16)",
             line=dict(width=0),
-            hovertemplate="<b>Month:</b> %{x|%b %Y}<br><b>Lower range:</b> %{y:.2f} TWh<extra>Lower confidence range around the forecast.</extra>",
+            hovertemplate="<b>Month:</b> %{x|%b %Y}<br><b>Illustrative lower model range:</b> %{y:.2f} TWh<extra>Uncalibrated model range derived from residual variation; not a probabilistic confidence interval.</extra>",
         )
     )
     fig.add_trace(

@@ -76,7 +76,7 @@ def forecast_demand(national: pd.DataFrame, months: int, scenario: str) -> pd.Da
     history = monthly[["date", "consumption_twh"]].rename(columns={"consumption_twh": "forecast_twh"})
     history["lower_twh"] = np.nan
     history["upper_twh"] = np.nan
-    history["scenario"] = "Observed"
+    history["scenario"] = "Estimated history"
     history["hydro_availability_index"] = 1.0
-    history["period"] = "Observed"
+    history["period"] = "Estimated history"
     return pd.concat([history, future], ignore_index=True)

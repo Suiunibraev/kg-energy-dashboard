@@ -2,7 +2,7 @@
 
 ## What Was Being Worked On
 
-The latest work integrated official 2024 useful electricity supply by ПЭС service territory and removed unsupported regional calculations.
+The latest work completed a Version 1 credibility-language pass without changing forecast values, scenarios, Security Index weights, or regional source values.
 
 - Added an auditable Security Index breakdown matching the existing calculation.
 - Added dashboard cards showing each component's weight, contribution, current indicator, and explanation.
@@ -10,6 +10,11 @@ The latest work integrated official 2024 useful electricity supply by ПЭС ser
   2024 useful-supply values and row-level provenance.
 - Disabled regional production, losses, balance, status, risk ranking, and the
   related recommendation because compatible official inputs are unavailable.
+- Removed the accounting reconciliation residual from Executive Overview KPIs.
+- Renamed synthetic monthly history as estimated history and confidence language as illustrative model ranges.
+- Added exact forecast-period labels and elapsed-period warnings.
+- Reclassified regional population as Official source / mapped.
+- Disclosed that related energy-coverage components account for 60 of 100 Index points.
 - Resolved the reported `security_index_breakdown` import issue and confirmed that `app.py` imports successfully.
 
 ## Files Modified
@@ -36,13 +41,13 @@ The relevant current files are:
 ## Outstanding Bugs
 
 - No active ImportError remains; `security_index_breakdown` is defined and importable.
-- No other confirmed runtime bug is currently known.
+- The methodology remains a prototype requiring expert calibration.
 - The full pytest suite is installed and passes.
 
 ## Next Steps
 
-1. Decide whether to keep both the display-oriented and lowercase columns returned by `security_index_breakdown`, or simplify the contract and update `app.py` consistently.
-2. Add a focused unit test confirming that the four breakdown scores sum to the unchanged Security Index, allowing for display rounding.
+1. Validate Security Index weights and component overlap with sector experts.
+2. Replace synthetic monthly history with observed monthly data when available.
 3. Extend the official ПЭС series when additional annual Settlement Center publications are validated.
 4. Obtain compatible official production and distribution-loss data before considering regional balance or risk calculations.
 
@@ -50,9 +55,7 @@ The relevant current files are:
 
 - Branch: `main`
 - Tracking: `origin/main`
-- HEAD: `4c1b175` (`Update app.py`)
-- Branch is synchronized with `origin/main`.
-- The working tree contains the official regional-data integration changes described above.
+- Current working tree contains the Version 1 credibility and regional-map updates described above.
 
 ## Incomplete Changes
 
@@ -62,7 +65,7 @@ The relevant current files are:
 
 ## Verification Already Completed
 
-- All six pytest tests pass.
+- The full pytest suite passes.
 - Python compile checks passed.
 - Streamlit visual verification confirmed the Regional Planning page renders the
   official ПЭС source notes, territorial caveat, useful-supply total, and no

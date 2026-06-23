@@ -219,7 +219,7 @@ def add_regional_planning_metrics(regional: pd.DataFrame, national: pd.DataFrame
         np.nan,
     )
 
-    out["population_data_quality"] = "Official"
+    out["population_data_quality"] = "Official source / mapped"
     out["useful_supply_data_quality"] = "Official"
     out["production_data_quality"] = "Not available"
     out["distribution_losses_data_quality"] = "Not available"
@@ -228,4 +228,7 @@ def add_regional_planning_metrics(regional: pd.DataFrame, national: pd.DataFrame
     out["demand_share_data_quality"] = "Derived"
     out["risk_data_quality"] = "Not available"
     out["population_source"] = REGIONAL_POPULATION_SOURCE_LABEL
+    out["population_alignment_note"] = (
+        "Official administrative population mapped to ПЭС territory; boundary alignment may be approximate."
+    )
     return out

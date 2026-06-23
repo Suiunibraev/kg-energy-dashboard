@@ -25,7 +25,7 @@ energy_dashboard/
 
   forecasting.py
     Synthetic monthly history, Holt-Winters demand forecasting,
-    confidence bands, and Dry/Normal/Wet scenario assumptions
+    illustrative model ranges, and Dry/Normal/Wet scenario assumptions
 
   policy.py
     Energy Security Index, index breakdown, policy rules,
@@ -105,7 +105,7 @@ The Executive Overview is intentionally factual and current-data focused. It sho
 - Consumption
 - Domestic deficit
 - Net imports
-- Balance after trade
+- Accounting reconciliation residual is retained only in the detailed national table
 - Plain-English definitions and policy relevance for each metric
 
 It does not show the Security Index, recommendations, or forecast-driven metrics.
@@ -139,7 +139,7 @@ The page explicitly states that the Security Index combines current conditions w
 
 ### Scenario planning
 
-- Forecast-demand chart with confidence band
+- Forecast-demand chart with illustrative upper and lower model ranges
 - Highest winter- and summer-month energy indicators
 - Scenario-spread chart
 - Dry, Normal, and Wet scenario comparison
@@ -156,7 +156,7 @@ The Scenario Planning page currently displays the standard Normal-year, 18-month
 - Derived useful supply per capita
 - Derived share of national electricity demand
 - Per-metric data-quality labels
-- Visible source, assumption, and confidence notes
+- Visible source, assumption, and interpretation notes
 - Production, losses, balance, and risk ranking explicitly unavailable
 
 ### Reporting
@@ -295,14 +295,14 @@ If Holt-Winters fitting fails, the application uses:
 - A simple trend
 - Residual variation estimated from annual seasonal differences
 
-### Confidence bands
+### Illustrative model ranges
 
 ```python
 lower = forecast - 1.64 * residual_std
 upper = forecast + 1.64 * residual_std
 ```
 
-These are approximate planning bands, not calibrated probabilistic intervals.
+These are uncalibrated sensitivity bands, not probabilistic confidence intervals.
 
 ### Scenario assumptions
 
@@ -360,7 +360,7 @@ areas rather than guaranteed one-to-one administrative oblast boundaries.
 
 | Metric | Classification |
 | --- | --- |
-| Regional population | Official |
+| Regional population | Official source / mapped |
 | ПЭС useful electricity supply | Official |
 | Regional production | Not available |
 | Distribution losses | Not available |
@@ -369,7 +369,7 @@ areas rather than guaranteed one-to-one administrative oblast boundaries.
 | Share of national demand | Derived |
 | Regional risk score and level | Not available |
 
-Population values are official public estimates from the National Statistical Committee of the Kyrgyz Republic, reported for January 1, 2025 and used as the end-2024 population position.
+Population values are official public estimates from the National Statistical Committee of the Kyrgyz Republic, reported for January 1, 2025 and used as the end-2024 population position. They are mapped to ПЭС service territories, so boundary alignment may be approximate.
 
 Official useful supply totals 12,597.767126 GWh across the eight published ПЭС
 rows. Production, distribution losses, balance, status, and regional risk are
@@ -396,7 +396,7 @@ Only the official ПЭС useful-supply CSV is loaded for the regional layer.
 - Monthly demand history is estimated from annual data.
 - Forecasts do not include observed weather, reservoir levels, inflows,
   snowpack, outages, plant availability, fuel constraints, or network constraints.
-- Confidence bands are approximate.
+- Model ranges are uncalibrated sensitivity bands, not probabilistic confidence intervals.
 - Scenario multipliers are planning assumptions rather than calibrated hydrological models.
 
 ### Policy assessment
@@ -443,7 +443,7 @@ Only the official ПЭС useful-supply CSV is loaded for the regional layer.
 - Validate Security Index weights, score scaling, thresholds, and risk bands.
 - Validate recommended actions with electricity-sector experts.
 - Define an approved regional-risk methodology.
-- Calibrate forecast confidence using observed monthly forecast errors.
+- Calibrate forecast model ranges using observed monthly forecast errors.
 - Consider additional drought-severity scenarios after expert review.
 
 ### Testing
@@ -496,7 +496,7 @@ Recommended order for the next development session:
 
 5. **Begin monthly-data integration**
    - Prioritize observed monthly demand and generation.
-   - Recalibrate seasonality and confidence bands before adding more model complexity.
+   - Recalibrate seasonality and model ranges before adding more model complexity.
 
 6. **Calibrate the policy methodology**
    - Review index components, thresholds, labels, and action triggers with experts.

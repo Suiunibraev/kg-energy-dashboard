@@ -343,11 +343,19 @@ def executive_summary(national: pd.DataFrame, forecast: pd.DataFrame, scenario: 
     future = forecast[forecast["period"].eq("Forecast")].head(12)
     next_year_demand = float(future["forecast_twh"].sum()) if not future.empty else float(latest["consumption_twh"])
     demand_change = (next_year_demand / latest["consumption_twh"] - 1) * 100
+    forecast_start = future["date"].min()
+    forecast_end = future["date"].max()
+    forecast_period = (
+        f"{forecast_start:%B %Y} to {forecast_end:%B %Y}"
+        if pd.notna(forecast_start) and pd.notna(forecast_end)
+        else "the 12-month model period following the latest annual data year"
+    )
     deficit = float(latest["domestic_gap_twh"])
     direction = "above" if deficit >= 0 else "below"
     risk_phrase = "elevated winter supply risk" if security["label"] != "Secure" else "manageable near-term supply risk"
     return (
-        f"National electricity demand is projected to change by {demand_change:.1f}% over the next 12 months. "
+        f"National electricity demand is projected to change by {demand_change:.1f}% over the model period "
+        f"{forecast_period}. "
         f"Domestic production is {abs(deficit):.1f} TWh {direction} current consumption before trade. "
         f"Under the {scenario.lower()} scenario, the energy security index is {security['score']:.1f}/100, "
         f"indicating {risk_phrase}."

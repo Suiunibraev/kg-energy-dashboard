@@ -33,13 +33,13 @@ It can support monitoring, scenario discussion, and meeting preparation. It shou
 
 - Executive situation panel with current status, main risk driver, key concern, and outlook
 - National production, consumption, trade, generation-mix, and balance monitoring
-- Clear distinction between the domestic production gap and the balance after trade
+- Clear distinction between the domestic production gap and the accounting reconciliation residual
 - Explainable 0–100 Energy Security Index with a component breakdown
 - Auditable policy-rule thresholds and current trigger values
 - Recommended actions with the evidence behind each recommendation
 - “What Changed Since Last Year?” year-over-year insights
 - Dry, Normal, and Wet year Scenario Impact Analysis
-- Seasonal demand forecasts with confidence bands and peak-demand indicators
+- Seasonal demand forecasts with illustrative model ranges and monthly-energy indicators
 - Official 2024 useful electricity supply by ПЭС service territory
 - Regional population, derived per-capita supply, national-demand share, provenance, and data-quality labels
 - Downloadable Executive Energy Briefing PDF
@@ -69,7 +69,7 @@ flowchart TD
 | --- | --- |
 | `app.py` | Streamlit entry point, controls, page composition, tables, and downloads |
 | `energy_dashboard/data_sources.py` | Public data loaders, fallback data, derived national metrics, and regional planning indicators |
-| `energy_dashboard/forecasting.py` | Synthetic monthly history, Holt-Winters forecasting, confidence bands, and scenario multipliers |
+| `energy_dashboard/forecasting.py` | Synthetic monthly history, Holt-Winters forecasting, illustrative model ranges, and scenario multipliers |
 | `energy_dashboard/policy.py` | Energy Security Index, policy rules, year-over-year insights, scenario impacts, and recommended actions |
 | `energy_dashboard/reporting.py` | ReportLab generation of the Executive Energy Briefing PDF |
 | `energy_dashboard/ui.py` | Plotly charts, visual definitions, and Streamlit theme helpers |
@@ -103,7 +103,7 @@ The Regional View separates metrics into three categories:
 | **Derived** | Calculated transparently from official useful supply and other identified inputs |
 | **Not available** | Not published in the official regional source and not estimated |
 
-ПЭС useful supply and regional population are classified as **Official**. Per-capita supply and share of national demand are **Derived**. Regional production, losses, balance, status, and risk ranking are **Not available**.
+ПЭС useful supply is classified as **Official**. Population is classified as **Official source / mapped** because official administrative population is mapped to ПЭС territories whose boundary alignment may be approximate. Per-capita supply and share of national demand are **Derived**. Regional production, losses, balance, status, and risk ranking are **Not available**.
 
 ## National Electricity Metrics
 
@@ -117,7 +117,7 @@ hydro_share_pct = hydro_twh / production_twh * 100
 ```
 
 - **Domestic gap** shows whether domestic production covers consumption before trade.
-- **Net balance** includes imports and exports.
+- **Accounting reconciliation residual** is production plus imports minus consumption and exports. Values near zero are expected under the source accounting identity and do not demonstrate reserve adequacy or reliability.
 - **Net imports** measure imports minus exports.
 - **Hydropower share** indicates dependence on hydropower within domestic generation.
 
@@ -142,6 +142,8 @@ The dashboard displays each component’s weight, current indicator, contributio
 
 The reserve-margin component always uses a fixed 12-month demand forecast. Forecast horizon controls chart display only, so selecting a shorter or longer chart horizon does not alter the Security Index.
 
+Production coverage and forecast reserve margin are related energy-coverage measures and together account for 60 of 100 points. The prototype therefore primarily reflects energy coverage, hydropower dependence, and demand pressure rather than every dimension of electricity security. The weights remain unchanged pending expert calibration.
+
 The weights, thresholds, and risk bands have not been formally adopted by the Ministry. They require review and calibration by energy-sector experts before operational use.
 
 ## Forecasting Methodology
@@ -160,7 +162,9 @@ The primary forecast uses Holt-Winters exponential smoothing with:
 - Multiplicative seasonality
 - A 12-month seasonal period
 
-If model fitting fails, the application falls back to a seasonal average with a simple trend. Confidence bands use the fitted residual standard deviation and a `1.64` multiplier.
+If model fitting fails, the application falls back to a seasonal average with a simple trend. Illustrative upper and lower model ranges use the fitted residual standard deviation and a `1.64` multiplier. These are uncalibrated sensitivity bands, not probabilistic confidence intervals.
+
+Forecasts begin immediately after the latest complete annual data year. The dashboard displays the exact model period and warns when part of that period has already elapsed. Synthetic monthly values preceding the forecast are labeled **Estimated monthly history**, not observed demand.
 
 Planning scenarios apply the existing demand and hydropower multipliers:
 
@@ -177,7 +181,7 @@ The hydropower availability index is used in the scenario balance estimate, but 
 ### Forecast limitations
 
 - Monthly history is estimated from annual data rather than observed monthly demand.
-- Confidence bands are statistical approximations, not calibrated probabilistic forecasts.
+- Illustrative model ranges are uncalibrated sensitivity bands, not probabilistic confidence intervals.
 - The model does not currently include reservoir levels, inflows, snowpack, weather, plant availability, outages, fuel constraints, or network constraints.
 - Forecasts are planning aids and should not be treated as dispatch instructions.
 
