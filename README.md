@@ -1,3 +1,4 @@
+PAUSED 
 # Kyrgyzstan Energy Intelligence Dashboard
 
 A Streamlit-based electricity intelligence and policy-support dashboard for the Kyrgyz Republic.
