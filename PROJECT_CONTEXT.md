@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This project is a Streamlit-based energy intelligence and policy decision-support dashboard for Kyrgyzstan. It is designed for policymakers, energy planners, and non-technical Ministry staff who need a clear view of electricity security, production-demand balance, import dependency, regional risk, and seasonal forecast uncertainty.
+This project is a Streamlit-based energy intelligence and policy decision-support dashboard for Kyrgyzstan. It is designed for policymakers, energy planners, and non-technical Ministry staff who need a clear view of electricity security, production-demand balance, import dependency, ПЭС useful supply, and seasonal forecast uncertainty.
 
 The project has moved beyond a basic analytics dashboard. It now includes an explainable policy layer, auditable rules, recommended actions, scenario forecasting, and a downloadable executive PDF briefing.
 
@@ -11,13 +11,13 @@ The project has moved beyond a basic analytics dashboard. It now includes an exp
 ```text
 app.py                         Streamlit entry point and page composition
 energy_dashboard/
-  data_sources.py              Public data loaders, starter fallback data, derived national/regional metrics
+  data_sources.py              Public data loaders, national fallback data, official ПЭС supply and derived metrics
   forecasting.py               Monthly demand history construction and scenario forecast logic
-  policy.py                    Energy Security Index, policy rules, regional risk, actions, briefing text
+  policy.py                    Energy Security Index, policy rules, actions, briefing text
   reporting.py                 One-page PDF briefing generator using ReportLab
   ui.py                        Plotly chart builders and Streamlit CSS/theme helpers
 data/
-  regional_energy_starter.csv  Transparent starter regional dataset for demonstration
+  regional_useful_supply_2024.csv  Official 2024 useful supply by ПЭС service territory
 docs/
   MINISTRY_ONE_PAGER.md        Non-technical ministry handoff document
 tests/
@@ -35,7 +35,7 @@ runtime.txt                    Streamlit Cloud Python runtime setting
 3. `ensure_national_metrics()` defensively creates missing derived columns such as `domestic_gap_twh`, `net_balance_twh`, `net_imports_twh`, `solar_twh`, and `wind_twh`.
 4. Sidebar controls choose the year range, hydropower planning scenario, and forecast horizon.
 5. `forecast_demand()` creates monthly demand forecasts.
-6. `policy.py` computes the Energy Security Index, policy rules, regional risk, recommended actions, situation briefing, and time-intelligence indicators.
+6. `policy.py` computes the Energy Security Index, policy rules, recommended actions, situation briefing, and time-intelligence indicators.
 7. `ui.py` renders Plotly charts with explanatory hover definitions.
 8. `reporting.py` generates a downloadable executive energy briefing PDF.
 
@@ -95,14 +95,16 @@ hydro_share_pct = hydro_twh / production_twh * 100
 
 ### Regional View
 
-The regional view uses `data/regional_energy_starter.csv`. It includes:
+The regional view uses `data/regional_useful_supply_2024.csv`. It includes:
 
-- Regional map
-- Production vs consumption comparison
-- Risk ranking by region
-- Regional risk table
+- ПЭС service-territory map
+- Official annual useful-supply comparison
+- Population and derived per-capita/share indicators
+- Source document and row-level provenance
 
-Important: regional data is explicitly marked as a transparent starter/demo dataset. It is not official operational data and should be replaced with Ministry regional feeds before real use.
+Production, distribution losses, balance, status, and regional risk ranking are
+unavailable and are not estimated. ПЭС territories are network service areas,
+not guaranteed strict oblast boundaries.
 
 ### Forecasting
 
@@ -199,7 +201,6 @@ This supports the "what changed?" section.
 - Domestic deficit
 - Hydropower dependency
 - Winter peak demand
-- Highest regional risk score
 - Flagged policy rules
 
 Example actions include:
@@ -259,30 +260,33 @@ World Bank source:
 
 If public endpoints fail, `_fallback_national_data()` generates packaged starter national data from 2000-2024. This keeps the Streamlit app usable even when network/API access is unavailable.
 
-### Regional Starter Data
+### Official Regional Useful-Supply Data
 
 File:
 
 ```text
-data/regional_energy_starter.csv
+data/regional_useful_supply_2024.csv
 ```
 
 Columns:
 
 - `year`
 - `region`
+- `source_region_label`
+- `territory_type`
 - `lat`
 - `lon`
-- `production_gwh`
-- `consumption_gwh`
-- `distribution_losses_pct`
+- `useful_supply_gwh`
+- `metric`
+- `data_quality`
+- `data_provenance`
+- `source_organization`
+- `source_document`
+- `source_url`
 
-Derived columns:
-
-```python
-balance_gwh = production_gwh - consumption_gwh
-status = "Net producer" if balance_gwh >= 0 else "Net consumer"
-```
+Production, distribution losses, balance, and status are unavailable. The
+loader exposes null compatibility fields for these metrics and does not
+calculate a regional surplus/deficit.
 
 ### Source Freshness
 
@@ -302,8 +306,7 @@ Current charts:
 - Time intelligence chart
 - Scenario spread chart
 - Security gauge
-- Regional risk chart
-- Regional production vs consumption bar chart
+- Official ПЭС useful-supply bar chart
 - Forecast chart with confidence band
 
 Hover definitions have been added to chart traces so users see metric meaning, not only values.
@@ -331,7 +334,7 @@ Coverage includes:
 - forecast contract
 - security index contract
 - policy rules contract
-- regional risk and recommended actions contract
+- unavailable-regional-risk and recommended-actions contract
 
 Run compile checks:
 
@@ -342,7 +345,7 @@ python3 -m compileall app.py energy_dashboard tests
 Run direct tests without pytest:
 
 ```bash
-python3 -c "from tests.test_data_contract import test_national_data_contract, test_regional_data_contract, test_forecast_contract, test_security_index_contract, test_policy_rules_contract, test_regional_risk_and_actions_contract; test_national_data_contract(); test_regional_data_contract(); test_forecast_contract(); test_security_index_contract(); test_policy_rules_contract(); test_regional_risk_and_actions_contract(); print('checks passed')"
+python3 -c "from tests.test_data_contract import test_national_data_contract, test_regional_data_contract, test_forecast_contract, test_security_index_contract, test_policy_rules_contract, test_actions_do_not_use_unavailable_regional_risk; test_national_data_contract(); test_regional_data_contract(); test_forecast_contract(); test_security_index_contract(); test_policy_rules_contract(); test_actions_do_not_use_unavailable_regional_risk(); print('checks passed')"
 ```
 
 Run pytest:
@@ -409,7 +412,7 @@ Current repo workflow:
 High priority:
 
 - Add real monthly demand data if available.
-- Replace regional starter data with official Ministry regional data.
+- Extend the official ПЭС useful-supply series and obtain official production and loss data.
 - Calibrate Energy Security Index weights with domain experts.
 - Add actual source publication/update dates if available from APIs.
 - Add screenshots/GIFs and a live app link to README.
@@ -437,7 +440,7 @@ Portfolio polish:
 - Added source load timestamps and safer load failure handling.
 - Added definitions expander and explanatory Plotly hover templates.
 - Added policy tests in `tests/test_data_contract.py`.
-- Clarified forecast and regional starter-data limitations in the UI.
+- Integrated official 2024 ПЭС useful supply and disabled unsupported regional calculations.
 
 ## Practical Notes For Future Sessions
 

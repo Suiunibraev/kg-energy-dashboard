@@ -11,7 +11,7 @@ import requests
 
 
 ROOT = Path(__file__).resolve().parents[1]
-REGIONAL_STARTER_PATH = ROOT / "data" / "regional_energy_starter.csv"
+REGIONAL_USEFUL_SUPPLY_PATH = ROOT / "data" / "regional_useful_supply_2024.csv"
 REGIONAL_POPULATION_SOURCE_URL = (
     "https://stat.gov.kg/media/files/4c29e08a-580e-42d4-92c6-65cdf5a1554c.pptx"
 )
@@ -21,8 +21,7 @@ REGIONAL_POPULATION_SOURCE_LABEL = (
 REGIONAL_POPULATION_2025 = {
     "Bishkek City": 1_321_900,
     "Chuy": 971_300,
-    "Osh City": 473_500,
-    "Osh": 1_416_700,
+    "Osh service territory": 1_890_200,
     "Jalal-Abad": 1_358_500,
     "Batken": 594_700,
     "Talas": 280_500,
@@ -180,41 +179,27 @@ def load_energy_dataset() -> tuple[pd.DataFrame, list[SourceStatus]]:
     return national.sort_values("year").reset_index(drop=True), statuses
 
 
-def load_official_regional_dataset() -> pd.DataFrame | None:
-    """Load future official Ministry regional electricity data.
-
-    TODO: Replace this stub when a stable Ministry file or API is available.
-    The normalized dataset must contain:
-    - year
-    - region
-    - lat
-    - lon
-    - production_gwh
-    - consumption_gwh
-    - distribution_losses_pct
-
-    Return ``None`` while no official regional source is configured so
-    ``load_regional_dataset()`` continues to use the packaged starter data.
-    """
-    return None
+def load_official_regional_dataset() -> pd.DataFrame:
+    """Load official annual useful electricity supply by ПЭС service territory."""
+    return pd.read_csv(REGIONAL_USEFUL_SUPPLY_PATH)
 
 
 def load_regional_dataset() -> pd.DataFrame:
     regional = load_official_regional_dataset()
-    if regional is None:
-        regional = pd.read_csv(REGIONAL_STARTER_PATH)
-    regional["balance_gwh"] = regional["production_gwh"] - regional["consumption_gwh"]
-    regional["status"] = np.where(regional["balance_gwh"].ge(0), "Net producer", "Net consumer")
+    regional["production_gwh"] = np.nan
+    regional["distribution_losses_pct"] = np.nan
+    regional["balance_gwh"] = np.nan
+    regional["status"] = "Not available"
     return regional
 
 
 def add_regional_planning_metrics(regional: pd.DataFrame, national: pd.DataFrame) -> pd.DataFrame:
-    """Add transparent public and derived planning indicators to regional starter data."""
+    """Add transparent derived indicators to official ПЭС useful-supply data."""
     out = regional.copy()
     out["population"] = out["region"].map(REGIONAL_POPULATION_2025)
     out["demand_per_capita_kwh"] = np.where(
         out["population"].gt(0),
-        out["consumption_gwh"] * 1_000_000 / out["population"],
+        out["useful_supply_gwh"] * 1_000_000 / out["population"],
         np.nan,
     )
 
@@ -224,17 +209,17 @@ def add_regional_planning_metrics(regional: pd.DataFrame, national: pd.DataFrame
     national_demand_gwh = float(national_row["consumption_twh"]) * 1_000
     out["demand_share_pct"] = np.where(
         national_demand_gwh > 0,
-        out["consumption_gwh"] / national_demand_gwh * 100,
+        out["useful_supply_gwh"] / national_demand_gwh * 100,
         np.nan,
     )
 
     out["population_data_quality"] = "Official"
-    out["production_data_quality"] = "Demonstration"
-    out["consumption_data_quality"] = "Demonstration"
-    out["distribution_losses_data_quality"] = "Demonstration"
-    out["balance_data_quality"] = "Demonstration"
-    out["demand_per_capita_data_quality"] = "Estimated"
-    out["demand_share_data_quality"] = "Estimated"
-    out["risk_data_quality"] = "Demonstration"
+    out["useful_supply_data_quality"] = "Official"
+    out["production_data_quality"] = "Not available"
+    out["distribution_losses_data_quality"] = "Not available"
+    out["balance_data_quality"] = "Not available"
+    out["demand_per_capita_data_quality"] = "Derived"
+    out["demand_share_data_quality"] = "Derived"
+    out["risk_data_quality"] = "Not available"
     out["population_source"] = REGIONAL_POPULATION_SOURCE_LABEL
     return out

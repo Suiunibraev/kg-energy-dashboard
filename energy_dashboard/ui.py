@@ -425,58 +425,23 @@ def security_gauge(score: float, label: str) -> go.Figure:
     return fig
 
 
-def regional_risk_chart(regional_risk: pd.DataFrame) -> go.Figure:
-    colors = {"High": PALETTE["red"], "Medium": PALETTE["amber"], "Low": PALETTE["green"]}
-    ordered = regional_risk.sort_values("risk_score", ascending=True)
-    fig = go.Figure(
-        go.Bar(
-            y=ordered["region"],
-            x=ordered["risk_score"],
-            orientation="h",
-            marker_color=ordered["risk"].map(colors),
-            text=ordered["risk"],
-            textposition="inside",
-            hovertemplate="<b>Region:</b> %{y}<br><b>Risk score:</b> %{x:.1f}<extra>Regional risk combines deficit, demand concentration, and distribution losses.</extra>",
-        )
-    )
-    fig.update_layout(
-        margin=dict(l=20, r=20, t=30, b=20),
-        height=380,
-        xaxis_title="Risk score",
-        yaxis_title="",
-        showlegend=False,
-    )
-    return fig
-
-
 def regional_bar_chart(regional: pd.DataFrame) -> go.Figure:
-    ordered = regional.sort_values("consumption_gwh", ascending=True)
+    ordered = regional.sort_values("useful_supply_gwh", ascending=True)
     fig = go.Figure()
     fig.add_trace(
         go.Bar(
             y=ordered["region"],
-            x=ordered["consumption_gwh"],
+            x=ordered["useful_supply_gwh"],
             orientation="h",
-            name="Consumption",
+            name="Useful supply",
             marker_color=PALETTE["blue"],
-            hovertemplate="<b>Region:</b> %{y}<br><b>Consumption:</b> %{x:.0f} GWh<extra>Regional electricity consumption.</extra>",
-        )
-    )
-    fig.add_trace(
-        go.Bar(
-            y=ordered["region"],
-            x=ordered["production_gwh"],
-            orientation="h",
-            name="Production",
-            marker_color=PALETTE["teal"],
-            hovertemplate="<b>Region:</b> %{y}<br><b>Production:</b> %{x:.0f} GWh<extra>Regional electricity production.</extra>",
+            hovertemplate="<b>ПЭС territory:</b> %{y}<br><b>Useful supply:</b> %{x:.1f} GWh<extra>Official annual useful electricity supply through ПЭС networks.</extra>",
         )
     )
     fig.update_layout(
-        barmode="group",
         margin=dict(l=20, r=20, t=30, b=20),
         height=430,
-        xaxis_title="GWh",
+        xaxis_title="Official useful supply (GWh)",
         yaxis_title="",
         legend_title_text="",
     )

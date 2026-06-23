@@ -237,8 +237,9 @@ def build_ministry_briefing_pdf(
     methodology_note = (
         "Methodology note: The Security Index is an explainable policy prototype combining production coverage "
         "(35 points), hydropower dependency (20), recent demand growth (20), and forecast reserve margin (25). "
-        "Forecast monthly patterns are estimated from annual data and scenario multipliers. Regional electricity "
-        "values are demonstration-only. Use this briefing for strategic discussion and further analysis, not for "
+        "Forecast monthly patterns are estimated from annual data and scenario multipliers. Official 2024 useful "
+        "electricity supply is available by PES service territory; regional production, losses, balance, and risk "
+        "ranking remain unavailable. Use this briefing for strategic discussion and further analysis, not for "
         "real-time dispatch, binding procurement, budgeting, or investment approval."
     )
     story.extend(

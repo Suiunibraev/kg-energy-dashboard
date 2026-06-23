@@ -40,8 +40,8 @@ It can support monitoring, scenario discussion, and meeting preparation. It shou
 - “What Changed Since Last Year?” year-over-year insights
 - Dry, Normal, and Wet year Scenario Impact Analysis
 - Seasonal demand forecasts with confidence bands and peak-demand indicators
-- Regional map, production-demand comparison, and risk ranking
-- Regional population, demand per capita, national demand share, and data-quality labels
+- Official 2024 useful electricity supply by ПЭС service territory
+- Regional population, derived per-capita supply, national-demand share, provenance, and data-quality labels
 - Downloadable Executive Energy Briefing PDF
 - Live public-data loading with packaged fallback data
 
@@ -50,7 +50,7 @@ It can support monitoring, scenario discussion, and meeting preparation. It shou
 ```mermaid
 flowchart TD
     A["Public sources<br/>Our World in Data, World Bank,<br/>National Statistical Committee"] --> B["energy_dashboard/data_sources.py"]
-    C["Packaged starter data<br/>national fallback and regional CSV"] --> B
+    C["Packaged data<br/>national fallback and official ПЭС CSV"] --> B
     B --> D["app.py<br/>Streamlit composition and controls"]
     B --> E["energy_dashboard/forecasting.py<br/>Monthly history and scenarios"]
     E --> F["energy_dashboard/policy.py<br/>Security Index, rules, risks,<br/>actions, and briefing text"]
@@ -70,10 +70,10 @@ flowchart TD
 | `app.py` | Streamlit entry point, controls, page composition, tables, and downloads |
 | `energy_dashboard/data_sources.py` | Public data loaders, fallback data, derived national metrics, and regional planning indicators |
 | `energy_dashboard/forecasting.py` | Synthetic monthly history, Holt-Winters forecasting, confidence bands, and scenario multipliers |
-| `energy_dashboard/policy.py` | Energy Security Index, policy rules, year-over-year insights, regional risk, scenario impacts, and recommended actions |
+| `energy_dashboard/policy.py` | Energy Security Index, policy rules, year-over-year insights, scenario impacts, and recommended actions |
 | `energy_dashboard/reporting.py` | ReportLab generation of the Executive Energy Briefing PDF |
 | `energy_dashboard/ui.py` | Plotly charts, visual definitions, and Streamlit theme helpers |
-| `data/regional_energy_starter.csv` | Transparent regional electricity starter dataset |
+| `data/regional_useful_supply_2024.csv` | Official 2024 useful electricity supply by ПЭС service territory |
 | `docs/MINISTRY_ONE_PAGER.md` | Non-technical Ministry handoff document |
 | `tests/test_data_contract.py` | Data, forecast, policy, and regional contract checks |
 
@@ -100,10 +100,10 @@ The Regional View separates metrics into three categories:
 | Classification | Meaning |
 | --- | --- |
 | **Official** | Directly sourced from an official public statistical source |
-| **Estimated** | Calculated by combining data with different provenance or by applying a transparent formula |
-| **Demonstration** | Based on the packaged regional electricity starter dataset and unsuitable for operational decisions |
+| **Derived** | Calculated transparently from official useful supply and other identified inputs |
+| **Not available** | Not published in the official regional source and not estimated |
 
-Regional population is classified as **Official**. Demand per capita and regional demand share are **Estimated** because they use demonstration electricity demand. Regional electricity production, consumption, losses, balance, status, and risk ranking are **Demonstration**.
+ПЭС useful supply and regional population are classified as **Official**. Per-capita supply and share of national demand are **Derived**. Regional production, losses, balance, status, and risk ranking are **Not available**.
 
 ## National Electricity Metrics
 
@@ -179,35 +179,41 @@ Scenario Impact Analysis compares forecast demand, the unchanged Security Index,
 
 ## Regional Planning Layer and Limitations
 
-The Regional View preserves the starter electricity dataset structure:
+The Regional View loads the official 2024 Settlement Center schema:
 
 ```text
 year
 region
+source_region_label
+territory_type
 lat
 lon
-production_gwh
-consumption_gwh
-distribution_losses_pct
+useful_supply_gwh
+metric
+data_quality
+data_provenance
+source_organization
+source_document
+source_url
 ```
 
 The application adds population and derives:
 
 ```python
-balance_gwh = production_gwh - consumption_gwh
-demand_per_capita_kwh = consumption_gwh * 1_000_000 / population
-demand_share_pct = consumption_gwh / national_demand_gwh * 100
+demand_per_capita_kwh = useful_supply_gwh * 1_000_000 / population
+demand_share_pct = useful_supply_gwh / national_demand_gwh * 100
 ```
 
 Important limitations:
 
-- Regional production, consumption, and distribution losses are demonstration values, not official operational records.
-- Demand per capita combines official population with demonstration demand.
-- Regional demand shares are not a reconciled allocation of the national total.
-- Regional risk scores inherit the limitations of the starter electricity and losses data.
+- Values are ПЭС network service-territory figures, not guaranteed strict oblast boundaries.
+- Ошское ПЭС is published as one territory; Osh City is not reported separately.
+- Production and distribution losses are unavailable and are not estimated.
+- Balance, producer/consumer status, and regional risk ranking are disabled.
+- Per-capita supply and national-demand share are derived comparisons, not official statistics or an energy-balance reconciliation.
 - Map coordinates support visualization and are not network-asset locations.
 
-The current regional layer is useful for workflow design and data-contract discussion. It must be replaced with validated Ministry feeds before use in budgeting, procurement, dispatch, infrastructure prioritization, or investment approval.
+The useful-supply values are official public data, but the regional layer remains unsuitable for balance, loss, or risk assessment until compatible official production and loss data are available.
 
 ## Local Run Instructions
 
@@ -267,7 +273,7 @@ python3 -m pytest -q
 If `pytest` is not installed, run the current contract tests directly:
 
 ```bash
-python3 -c "from tests.test_data_contract import test_national_data_contract, test_regional_data_contract, test_forecast_contract, test_security_index_contract, test_policy_rules_contract, test_regional_risk_and_actions_contract; test_national_data_contract(); test_regional_data_contract(); test_forecast_contract(); test_security_index_contract(); test_policy_rules_contract(); test_regional_risk_and_actions_contract(); print('checks passed')"
+python3 -c "from tests.test_data_contract import test_national_data_contract, test_regional_data_contract, test_forecast_contract, test_security_index_contract, test_policy_rules_contract, test_actions_do_not_use_unavailable_regional_risk; test_national_data_contract(); test_regional_data_contract(); test_forecast_contract(); test_security_index_contract(); test_policy_rules_contract(); test_actions_do_not_use_unavailable_regional_risk(); print('checks passed')"
 ```
 
 ## Screenshots
@@ -284,7 +290,7 @@ python3 -c "from tests.test_data_contract import test_national_data_contract, te
 
 ### Regional planning layer
 
-![Placeholder: Regional map, risk ranking, and data quality](docs/screenshots/regional-planning-placeholder.png)
+![Placeholder: ПЭС useful-supply map, provenance, and data quality](docs/screenshots/regional-planning-placeholder.png)
 
 ### Executive Energy Briefing PDF
 
@@ -294,7 +300,7 @@ python3 -c "from tests.test_data_contract import test_national_data_contract, te
 
 ### Data readiness
 
-- Replace regional starter electricity data with validated Ministry regional feeds.
+- Extend the official ПЭС useful-supply series and obtain compatible official production and loss data.
 - Connect observed monthly demand, generation, imports, exports, and losses.
 - Add reservoir levels, inflows, snowpack, weather, outages, maintenance, and plant availability.
 - Record source publication dates and revision status, not only application load times.

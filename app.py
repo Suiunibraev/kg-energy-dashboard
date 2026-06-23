@@ -16,7 +16,6 @@ from energy_dashboard.policy import (
     evaluate_policy_rules,
     peak_demand_summary,
     recommended_actions,
-    regional_risk_ranking,
     scenario_impact_analysis,
     security_index_breakdown,
     situation_briefing,
@@ -32,7 +31,6 @@ from energy_dashboard.ui import (
     generation_mix_chart,
     line_chart,
     regional_bar_chart,
-    regional_risk_chart,
     scenario_spread_chart,
     security_gauge,
     time_intelligence_chart,
@@ -125,12 +123,11 @@ baseline_forecast = forecast_demand(national_df, months=baseline_months, scenari
 baseline_peaks = peak_demand_summary(baseline_forecast)
 security = calculate_security_index(national_df, baseline_forecast)
 security_breakdown = security_index_breakdown(national_df, baseline_forecast)
-regional_risk = regional_risk_ranking(regional_df)
 time_df, changes = time_intelligence(national_df)
 changes_summary = year_over_year_summary(changes)
 rules = evaluate_policy_rules(national_df, security)
 briefing = situation_briefing(security, rules, changes)
-actions = recommended_actions(national_df, regional_risk, rules, baseline_peaks, security)
+actions = recommended_actions(national_df, rules, baseline_peaks, security)
 summary_text = executive_summary(national_df, baseline_forecast, baseline_scenario, security)
 baseline_scenario_outputs = {
     name: forecast_demand(national_df, months=baseline_months, scenario=name)
@@ -144,7 +141,7 @@ baseline_scenario_forecasts = pd.concat(
 
 st.title("Kyrgyzstan Energy Intelligence Dashboard")
 st.markdown(
-    "For policymakers and energy planners: monitor Kyrgyzstan's electricity security, seasonal demand risk, imports, regional deficits, and forecast uncertainty."
+    "For policymakers and energy planners: monitor Kyrgyzstan's electricity security, seasonal demand risk, imports, official ПЭС useful supply, and forecast uncertainty."
 )
 
 if dashboard_section == "Executive Overview":
@@ -231,7 +228,6 @@ elif dashboard_section == "Energy Security Assessment":
     briefing = situation_briefing(security, rules, changes)
     actions = recommended_actions(
         national_df,
-        regional_risk,
         rules,
         assessment_peaks,
         security,
@@ -415,93 +411,96 @@ elif dashboard_section == "National Monitoring":
         )
 
 elif dashboard_section == "Regional Planning":
-    st.subheader("Regional electricity planning layer")
+    st.subheader("ПЭС service-territory electricity planning layer")
     st.markdown(
-        '<p class="section-note">Regional ranking highlights where demand, deficits, distribution losses, population, and demand concentration create planning pressure.</p>',
+        '<p class="section-note">Official 2024 useful electricity supply through the eight ПЭС service territories, with transparent source provenance and derived planning context.</p>',
         unsafe_allow_html=True,
     )
     st.warning(
-        "This is a mixed-quality planning layer. Population is official public data; electricity production, "
-        "consumption, and losses remain demonstration-only starter values. Derived indicators are not official statistics."
+        "ПЭС service territories are electricity-network operating areas, not guaranteed one-to-one administrative "
+        "oblast boundaries. The official source reports Osh as one Ошское ПЭС territory and does not publish a "
+        "separate Osh City value."
     )
     with st.expander("Data sources, quality, and confidence notes", expanded=True):
         st.markdown(
             f"""
-            - **Official:** Regional population estimates are from the
+            - **Official useful supply:** The Kyrgyz Electricity Settlement Center's *Brief electricity balance
+              for the Kyrgyz power system for 2024*, section 6.3, reports annual useful electricity supply by ПЭС.
+              Values are converted from thousand kWh to GWh without estimation.
+            - **Official population:** Population estimates are from the
               [National Statistical Committee of the Kyrgyz Republic]({REGIONAL_POPULATION_SOURCE_URL}),
               reported for January 1, 2025 and used as the end-2024 population position.
-            - **Estimated:** Demand per capita combines official population with demonstration electricity demand.
-              Regional demand share divides demonstration regional demand by the currently loaded national demand value
-              for the same year; the national source status is shown in the sidebar.
-            - **Demonstration:** Regional production, consumption, distribution losses, balance, status, and risk ranking
-              come from or depend on the packaged starter electricity dataset. They are workflow examples, not operational evidence.
+            - **Derived:** Per-capita supply divides official ПЭС useful supply by the mapped official population.
+              The Osh denominator combines Osh oblast and Osh City population because the electricity source reports
+              one Ошское ПЭС value. Demand share divides ПЭС useful supply by the loaded national annual demand.
+            - **Not available:** Official ПЭС production, distribution losses, regional balance, and regional risk
+              are not present in this dataset. They are not estimated or calculated from partial data.
             """
         )
         quality_rows = pd.DataFrame(
             [
                 ["Population", "Official", "Public regional population estimate at January 1, 2025."],
-                ["Production", "Demonstration", "Packaged starter electricity value."],
-                ["Consumption", "Demonstration", "Packaged starter electricity value."],
-                ["Distribution losses", "Demonstration", "Packaged starter electricity value."],
-                ["Demand per capita", "Estimated", "Demonstration demand divided by official population."],
-                ["Regional demand share", "Estimated", "Demonstration regional demand divided by national annual demand."],
-                ["Balance and status", "Demonstration", "Derived from demonstration production and consumption."],
-                ["Risk score and level", "Demonstration", "Derived from demonstration electricity and loss values."],
+                ["Useful electricity supply", "Official", "Settlement Center 2024 annual balance, section 6.3."],
+                ["Production", "Not available", "No official ПЭС production field is used."],
+                ["Distribution losses", "Not available", "No official ПЭС loss field is used."],
+                ["Per-capita useful supply", "Derived", "Official useful supply divided by mapped official population."],
+                ["Share of national demand", "Derived", "Official useful supply divided by loaded national annual demand."],
+                ["Balance and status", "Not available", "Disabled because official production is unavailable."],
+                ["Risk score and ranking", "Not available", "Disabled because production and losses are unavailable."],
             ],
             columns=["Regional metric", "Data Quality", "Source or method"],
         )
         st.dataframe(quality_rows, width="stretch", hide_index=True)
         st.caption(
-            "Confidence note: use population for broad planning context only. Do not use the regional electricity, "
-            "per-capita, demand-share, balance, or risk values for budgeting, dispatch, procurement, or investment "
-            "approval until they are replaced and validated against official Ministry regional feeds. The starter "
-            "regional demand values are not reconciled to the national total."
+            "Territorial caveat: values describe ПЭС network service territories. Per-capita supply is suitable only "
+            "for broad planning context because mapped administrative populations may not exactly match network "
+            "boundaries. Production, losses, surplus/deficit, and risk ranking remain unavailable."
         )
     map_df = regional_df.copy()
-    map_df["marker_size"] = (map_df["consumption_gwh"] / map_df["consumption_gwh"].max() * 28 + 8).round(1)
+    map_df["marker_size"] = (map_df["useful_supply_gwh"] / map_df["useful_supply_gwh"].max() * 28 + 8).round(1)
     map_df["color"] = "#2563eb"
     st.map(map_df, latitude="lat", longitude="lon", size="marker_size", color="color")
 
-    left, right = st.columns([1.15, 1])
-    left.plotly_chart(regional_bar_chart(regional_df), width="stretch")
-    right.plotly_chart(regional_risk_chart(regional_risk), width="stretch")
-    regional_table = regional_risk[
+    st.plotly_chart(regional_bar_chart(regional_df), width="stretch")
+    regional_table = regional_df[
             [
                 "region",
-                "risk",
-                "risk_score",
-                "status",
-                "production_gwh",
-                "consumption_gwh",
+                "source_region_label",
+                "territory_type",
+                "year",
+                "useful_supply_gwh",
                 "population",
                 "demand_per_capita_kwh",
                 "demand_share_pct",
-                "balance_gwh",
-                "distribution_losses_pct",
-                "population_data_quality",
-                "consumption_data_quality",
+                "production_data_quality",
+                "distribution_losses_data_quality",
+                "balance_data_quality",
+                "useful_supply_data_quality",
                 "demand_per_capita_data_quality",
                 "demand_share_data_quality",
-                "risk_data_quality",
+                "source_document",
+                "data_provenance",
+                "source_url",
             ]
         ].rename(
             columns={
-                "region": "Region",
-                "risk": "Risk",
-                "risk_score": "Risk score",
-                "status": "Status",
-                "production_gwh": "Production (GWh)",
-                "consumption_gwh": "Demand (GWh)",
+                "region": "ПЭС territory",
+                "source_region_label": "Official source label",
+                "territory_type": "Territory type",
+                "year": "Source year",
+                "useful_supply_gwh": "Useful supply (GWh)",
                 "population": "Population",
-                "demand_per_capita_kwh": "Demand per capita (kWh)",
-                "demand_share_pct": "National demand share (%)",
-                "balance_gwh": "Balance (GWh)",
-                "distribution_losses_pct": "Distribution losses (%)",
-                "population_data_quality": "Population quality",
-                "consumption_data_quality": "Demand quality",
+                "demand_per_capita_kwh": "Derived supply per capita (kWh)",
+                "demand_share_pct": "Derived share of national demand (%)",
+                "production_data_quality": "Production",
+                "distribution_losses_data_quality": "Losses",
+                "balance_data_quality": "Balance",
+                "useful_supply_data_quality": "Supply quality",
                 "demand_per_capita_data_quality": "Per-capita quality",
                 "demand_share_data_quality": "Demand-share quality",
-                "risk_data_quality": "Risk quality",
+                "source_document": "Source document",
+                "data_provenance": "Data provenance",
+                "source_url": "Source URL",
             }
         )
     st.dataframe(
@@ -510,9 +509,10 @@ elif dashboard_section == "Regional Planning":
         hide_index=True,
     )
     st.caption(
-        f"Demonstration regional demand currently accounts for "
-        f"{regional_risk['demand_share_pct'].sum():.1f}% of the loaded national demand. "
-        "The difference confirms that the starter regional values are not a reconciled official allocation."
+        f"Official 2024 useful supply through the eight ПЭС networks totals "
+        f"{regional_df['useful_supply_gwh'].sum():,.1f} GWh and represents "
+        f"{regional_df['demand_share_pct'].sum():.1f}% of the loaded national demand series. "
+        "The two measures have different accounting scopes, so the percentage is a derived comparison rather than reconciliation."
     )
 
 elif dashboard_section == "Scenario Planning":
@@ -623,7 +623,7 @@ elif dashboard_section == "Methodology":
         - **World Bank:** electricity access and population indicators where available.
         - **National Statistical Committee:** official regional population estimates used in the regional planning layer.
         - **Packaged fallback:** if national public endpoints fail, starter national data keeps the application usable.
-        - **Regional starter file:** packaged electricity production, consumption, and loss values support demonstration and workflow design only.
+        - **Kyrgyz Electricity Settlement Center:** official 2024 useful electricity supply by ПЭС service territory.
         """
     )
     st.info(
@@ -634,11 +634,11 @@ elif dashboard_section == "Methodology":
     st.markdown("### Regional data limitations")
     st.markdown(
         """
-        - Regional population is classified as **Official**.
-        - Regional electricity production, consumption, losses, balance, and risk ranking are **Demonstration**.
-        - Demand per capita and regional demand share are **Estimated** because they use demonstration demand.
-        - Starter regional demand is not reconciled to the national electricity total.
-        - Regional risk rankings should not determine funding or infrastructure priorities until official Ministry data replaces the starter values.
+        - ПЭС useful electricity supply for 2024 is classified as **Official**.
+        - ПЭС territories are network service areas and may not exactly match administrative oblast boundaries.
+        - Production, distribution losses, regional balance, and regional risk ranking are **Not available**.
+        - Per-capita supply and share of national demand are **Derived** and clearly labeled.
+        - No missing regional production or loss values are estimated.
         """
     )
 
@@ -677,7 +677,7 @@ elif dashboard_section == "Methodology":
             """
         )
     st.warning(
-        "Interpret scores, forecasts, regional rankings, and recommended actions as decision-support signals—not final decisions."
+        "Interpret national scores, forecasts, and recommended actions as decision-support signals—not final decisions."
     )
 
 elif dashboard_section == "Data & Handoff":
@@ -703,15 +703,15 @@ elif dashboard_section == "Data & Handoff":
         mime="text/csv",
     )
     st.download_button(
-        "Download regional starter dataset",
+        "Download official 2024 ПЭС useful supply dataset",
         regional_df.to_csv(index=False).encode("utf-8"),
-        file_name="kyrgyzstan_energy_regions_starter.csv",
+        file_name="kyrgyzstan_pes_useful_supply_2024.csv",
         mime="text/csv",
     )
 
 st.divider()
 st.caption(
-    "Data sources: Our World in Data, World Bank, packaged regional starter data. "
+    "Data sources: Our World in Data, World Bank, National Statistical Committee, Kyrgyz Electricity Settlement Center. "
     "Built with Streamlit, Plotly, Pandas, and Statsmodels. "
     "GitHub: https://github.com/Suiunibraev/kg-energy-dashboard"
 )

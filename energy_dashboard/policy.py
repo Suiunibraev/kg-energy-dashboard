@@ -270,7 +270,6 @@ def situation_briefing(security: dict, rules: pd.DataFrame, changes: dict) -> di
 
 def recommended_actions(
     national: pd.DataFrame,
-    regional_risk: pd.DataFrame,
     rules: pd.DataFrame,
     peaks: dict,
     security: dict,
@@ -279,10 +278,6 @@ def recommended_actions(
     demand = float(latest["consumption_twh"])
     deficit = max(0, -float(latest["domestic_gap_twh"]))
     winter_peak = float(peaks["winter_peak_twh"])
-    high_region = regional_risk.iloc[0]["region"] if not regional_risk.empty else "highest-risk region"
-    high_region_score = float(regional_risk.iloc[0]["risk_score"]) if not regional_risk.empty else 0.0
-    high_region_risk = str(regional_risk.iloc[0]["risk"]) if not regional_risk.empty else "not available"
-
     actions = []
     if deficit > 0:
         actions.append(
@@ -317,17 +312,6 @@ def recommended_actions(
                 "Reason": "Peak risk is concentrated in winter rather than annual totals.",
             }
         )
-    actions.append(
-        {
-            "Priority": "Medium",
-            "Recommended action": f"Prioritize grid reinforcement and loss reduction in {high_region}.",
-            "Trigger / evidence": (
-                f"{high_region} is the highest-risk region with a score of "
-                f"{high_region_score:.1f} ({high_region_risk} risk)."
-            ),
-            "Reason": "Regional ranking combines deficits, demand concentration, and distribution losses.",
-        }
-    )
     flagged_rules = rules[rules["Status"].isin(["High", "Flagged"])]
     if not flagged_rules.empty:
         evidence = "; ".join(
@@ -434,17 +418,3 @@ def peak_demand_summary(forecast: pd.DataFrame) -> dict[str, float | pd.Timestam
         "winter_peak_date": winter_row["date"],
         "summer_peak_date": summer_row["date"],
     }
-
-
-def regional_risk_ranking(regional: pd.DataFrame) -> pd.DataFrame:
-    ranked = regional.copy()
-    deficit_ratio = ((ranked["consumption_gwh"] - ranked["production_gwh"]).clip(lower=0) / ranked["consumption_gwh"]).fillna(0)
-    losses_score = (ranked["distribution_losses_pct"] / ranked["distribution_losses_pct"].max()).fillna(0)
-    demand_score = (ranked["consumption_gwh"] / ranked["consumption_gwh"].max()).fillna(0)
-    ranked["risk_score"] = (deficit_ratio * 60 + losses_score * 25 + demand_score * 15).round(1)
-    ranked["risk"] = np.select(
-        [ranked["risk_score"].ge(65), ranked["risk_score"].ge(35)],
-        ["High", "Medium"],
-        default="Low",
-    )
-    return ranked.sort_values(["risk_score", "consumption_gwh"], ascending=False).reset_index(drop=True)

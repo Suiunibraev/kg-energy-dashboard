@@ -5,7 +5,6 @@ from energy_dashboard.policy import (
     evaluate_policy_rules,
     peak_demand_summary,
     recommended_actions,
-    regional_risk_ranking,
 )
 
 
@@ -31,8 +30,37 @@ def test_national_data_contract():
 
 def test_regional_data_contract():
     regional = load_regional_dataset()
-    assert {"region", "lat", "lon", "production_gwh", "consumption_gwh", "balance_gwh"}.issubset(regional.columns)
-    assert regional["region"].nunique() >= 7
+    required = {
+        "year",
+        "region",
+        "source_region_label",
+        "territory_type",
+        "lat",
+        "lon",
+        "useful_supply_gwh",
+        "metric",
+        "data_quality",
+        "data_provenance",
+        "source_organization",
+        "source_document",
+        "source_url",
+    }
+    assert required.issubset(regional.columns)
+    assert len(regional) == 8
+    assert regional["year"].eq(2024).all()
+    assert regional["territory_type"].eq("PES service territory").all()
+    assert regional["data_quality"].eq("Official").all()
+    assert regional["data_provenance"].str.len().gt(0).all()
+    assert regional["source_url"].str.startswith("https://esep.energo.kg/").all()
+    assert abs(regional["useful_supply_gwh"].sum() - 12_597.767126) < 1e-6
+    assert "consumption_gwh" not in regional.columns
+    assert "Osh service territory" in set(regional["region"])
+    assert "Osh City" not in set(regional["region"])
+    assert regional["production_gwh"].isna().all()
+    assert regional["distribution_losses_pct"].isna().all()
+    assert regional["balance_gwh"].isna().all()
+    assert regional["status"].eq("Not available").all()
+
     national, _ = load_energy_dataset()
     planning = add_regional_planning_metrics(regional, national)
     assert {
@@ -40,15 +68,23 @@ def test_regional_data_contract():
         "demand_per_capita_kwh",
         "demand_share_pct",
         "population_data_quality",
-        "consumption_data_quality",
+        "useful_supply_data_quality",
+        "production_data_quality",
+        "distribution_losses_data_quality",
+        "balance_data_quality",
         "demand_per_capita_data_quality",
         "demand_share_data_quality",
         "risk_data_quality",
     }.issubset(planning.columns)
     assert planning["population"].notna().all()
     assert planning["population_data_quality"].eq("Official").all()
-    assert planning["consumption_data_quality"].eq("Demonstration").all()
-    assert planning["demand_per_capita_data_quality"].eq("Estimated").all()
+    assert planning["useful_supply_data_quality"].eq("Official").all()
+    assert planning["production_data_quality"].eq("Not available").all()
+    assert planning["distribution_losses_data_quality"].eq("Not available").all()
+    assert planning["balance_data_quality"].eq("Not available").all()
+    assert planning["risk_data_quality"].eq("Not available").all()
+    assert planning["demand_per_capita_data_quality"].eq("Derived").all()
+    assert planning["demand_share_data_quality"].eq("Derived").all()
 
 
 def test_forecast_contract():
@@ -81,16 +117,16 @@ def test_policy_rules_contract():
     assert set(rules["Status"]).issubset({"Normal", "Moderate", "High", "Flagged"})
 
 
-def test_regional_risk_and_actions_contract():
+def test_actions_do_not_use_unavailable_regional_risk():
     national, _ = load_energy_dataset()
     national["net_imports_twh"] = national["imports_twh"] - national["exports_twh"]
     forecast = forecast_demand(national, months=12, scenario="Normal year")
     security = calculate_security_index(national, forecast)
     rules = evaluate_policy_rules(national, security)
     peaks = peak_demand_summary(forecast)
-    regional_risk = regional_risk_ranking(load_regional_dataset())
-    actions = recommended_actions(national, regional_risk, rules, peaks, security)
-    assert {"region", "risk", "risk_score"}.issubset(regional_risk.columns)
-    assert regional_risk["risk_score"].is_monotonic_decreasing
+    actions = recommended_actions(national, rules, peaks, security)
     assert {"Priority", "Recommended action", "Reason"}.issubset(actions.columns)
     assert len(actions) >= 1
+    action_text = " ".join(actions["Recommended action"].astype(str)).lower()
+    assert "highest-risk region" not in action_text
+    assert "loss reduction in" not in action_text
