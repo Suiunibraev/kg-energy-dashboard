@@ -29,6 +29,16 @@ REGIONAL_POPULATION_2025 = {
     "Issyk-Kul": 549_800,
 }
 
+REGIONAL_REQUIRED_COLUMNS = (
+    "year",
+    "region",
+    "lat",
+    "lon",
+    "useful_supply_gwh",
+    "data_quality",
+    "source_url",
+)
+
 OWID_ENERGY_CSV = "https://raw.githubusercontent.com/owid/energy-data/master/owid-energy-data.csv"
 WORLD_BANK_API = "https://api.worldbank.org/v2/country/KGZ/indicator/{indicator}?format=json&per_page=200"
 
@@ -187,7 +197,14 @@ def load_energy_dataset() -> tuple[pd.DataFrame, list[SourceStatus]]:
 
 def load_official_regional_dataset() -> pd.DataFrame:
     """Load official annual useful electricity supply by ПЭС service territory."""
-    return pd.read_csv(REGIONAL_USEFUL_SUPPLY_PATH)
+    regional = pd.read_csv(REGIONAL_USEFUL_SUPPLY_PATH)
+    missing = [column for column in REGIONAL_REQUIRED_COLUMNS if column not in regional.columns]
+    if missing:
+        raise ValueError(f"{REGIONAL_USEFUL_SUPPLY_PATH.name} is missing required columns: {', '.join(missing)}")
+    unmapped = sorted(set(regional["region"]) - set(REGIONAL_POPULATION_2025))
+    if unmapped:
+        raise ValueError(f"No 2025 population mapping for region(s): {', '.join(unmapped)}")
+    return regional
 
 
 def load_regional_dataset() -> pd.DataFrame:

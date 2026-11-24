@@ -1,4 +1,5 @@
 import pytest
+import pandas as pd
 
 from energy_dashboard.data_sources import (
     SourceStatus,
@@ -213,3 +214,13 @@ def test_actions_do_not_use_unavailable_regional_risk():
     assert "highest-risk region" not in action_text
     assert "loss reduction in" not in action_text
     assert "covering at least" not in action_text
+
+
+def test_regional_loader_rejects_missing_columns(tmp_path, monkeypatch):
+    import energy_dashboard.data_sources as data_sources
+
+    broken = tmp_path / "regional.csv"
+    pd.read_csv(data_sources.REGIONAL_USEFUL_SUPPLY_PATH).drop(columns=["useful_supply_gwh"]).to_csv(broken, index=False)
+    monkeypatch.setattr(data_sources, "REGIONAL_USEFUL_SUPPLY_PATH", broken)
+    with pytest.raises(ValueError, match="useful_supply_gwh"):
+        data_sources.load_official_regional_dataset()
