@@ -21,56 +21,23 @@ def _clip(value: float, lower: float, upper: float) -> float:
     return float(max(lower, min(upper, value)))
 
 
+SECURE_THRESHOLD = 75
+MODERATE_RISK_THRESHOLD = 50
+
+
 def security_band(score: float) -> tuple[str, str]:
-    if score >= 75:
+    if score >= SECURE_THRESHOLD:
         return "Secure", "green"
-    if score >= 50:
+    if score >= MODERATE_RISK_THRESHOLD:
         return "Moderate Risk", "amber"
     return "High Risk", "red"
 
 
-def calculate_security_index(national: pd.DataFrame, forecast: pd.DataFrame) -> dict[str, float | str]:
-    latest = national.sort_values("year").iloc[-1]
-    recent = national.sort_values("year").tail(6)
-    future = forecast[forecast["period"].eq("Forecast")].head(ASSESSMENT_WINDOW_MONTHS)
-    if len(future) < ASSESSMENT_WINDOW_MONTHS:
-        raise ValueError(
-            f"Security Index requires a fixed {ASSESSMENT_WINDOW_MONTHS}-month forecast assessment window."
-        )
-
-    balance_ratio = latest["production_twh"] / latest["consumption_twh"]
-    balance_score = _clip(balance_ratio / 1.05, 0, 1) * 35
-
-    hydro_share = float(latest.get("hydro_share_pct", 0))
-    hydro_score = _clip(1 - max(0, hydro_share - 55) / 40, 0, 1) * 20
-
-    if len(recent) >= 2:
-        demand_growth = recent["consumption_twh"].pct_change().tail(5).mean()
-    else:
-        demand_growth = 0.0
-    growth_score = _clip((0.065 - demand_growth) / 0.055, 0, 1) * 20
-
-    forecast_demand = float(future["forecast_twh"].sum()) if not future.empty else float(latest["consumption_twh"])
-    reserve_margin = (float(latest["production_twh"]) - forecast_demand) / forecast_demand
-    reserve_score = _clip((reserve_margin + 0.20) / 0.35, 0, 1) * 25
-
-    score = round(balance_score + hydro_score + growth_score + reserve_score, 1)
-    label, color = security_band(score)
-    return {
-        "score": score,
-        "label": label,
-        "color": color,
-        "demand_growth_pct": round(demand_growth * 100, 1),
-        "reserve_margin_pct": round(reserve_margin * 100, 1),
-        "hydro_share_pct": round(hydro_share, 1),
-        "production_coverage_pct": round(balance_ratio * 100, 1),
-    }
-
-
-def security_index_breakdown(national: pd.DataFrame, forecast: pd.DataFrame) -> pd.DataFrame:
-    """Return an auditable breakdown using the fixed 12-month assessment window."""
-    latest = national.sort_values("year").iloc[-1]
-    recent = national.sort_values("year").tail(6)
+def _security_components(national: pd.DataFrame, forecast: pd.DataFrame) -> dict[str, float]:
+    """Compute the raw indicators and weighted scores shared by the index and its breakdown."""
+    ordered = national.sort_values("year")
+    latest = ordered.iloc[-1]
+    recent = ordered.tail(6)
     future = forecast[forecast["period"].eq("Forecast")].head(ASSESSMENT_WINDOW_MONTHS)
     if len(future) < ASSESSMENT_WINDOW_MONTHS:
         raise ValueError(
@@ -78,20 +45,48 @@ def security_index_breakdown(national: pd.DataFrame, forecast: pd.DataFrame) -> 
         )
 
     balance_ratio = float(latest["production_twh"]) / float(latest["consumption_twh"])
-    balance_score = _clip(balance_ratio / 1.05, 0, 1) * 35
-
     hydro_share = float(latest.get("hydro_share_pct", 0))
-    hydro_score = _clip(1 - max(0, hydro_share - 55) / 40, 0, 1) * 20
-
     if len(recent) >= 2:
         demand_growth = float(recent["consumption_twh"].pct_change().tail(5).mean())
     else:
         demand_growth = 0.0
-    growth_score = _clip((0.065 - demand_growth) / 0.055, 0, 1) * 20
-
-    forecast_demand = float(future["forecast_twh"].sum()) if not future.empty else float(latest["consumption_twh"])
+    forecast_demand = float(future["forecast_twh"].sum())
     reserve_margin = (float(latest["production_twh"]) - forecast_demand) / forecast_demand
-    reserve_score = _clip((reserve_margin + 0.20) / 0.35, 0, 1) * 25
+
+    return {
+        "balance_ratio": balance_ratio,
+        "hydro_share": hydro_share,
+        "demand_growth": demand_growth,
+        "reserve_margin": reserve_margin,
+        "balance_score": _clip(balance_ratio / 1.05, 0, 1) * 35,
+        "hydro_score": _clip(1 - max(0, hydro_share - 55) / 40, 0, 1) * 20,
+        "growth_score": _clip((0.065 - demand_growth) / 0.055, 0, 1) * 20,
+        "reserve_score": _clip((reserve_margin + 0.20) / 0.35, 0, 1) * 25,
+    }
+
+
+def calculate_security_index(national: pd.DataFrame, forecast: pd.DataFrame) -> dict[str, float | str]:
+    c = _security_components(national, forecast)
+    score = round(c["balance_score"] + c["hydro_score"] + c["growth_score"] + c["reserve_score"], 1)
+    label, color = security_band(score)
+    return {
+        "score": score,
+        "label": label,
+        "color": color,
+        "demand_growth_pct": round(c["demand_growth"] * 100, 1),
+        "reserve_margin_pct": round(c["reserve_margin"] * 100, 1),
+        "hydro_share_pct": round(c["hydro_share"], 1),
+        "production_coverage_pct": round(c["balance_ratio"] * 100, 1),
+    }
+
+
+def security_index_breakdown(national: pd.DataFrame, forecast: pd.DataFrame) -> pd.DataFrame:
+    """Return an auditable breakdown using the fixed 12-month assessment window."""
+    c = _security_components(national, forecast)
+    balance_ratio, hydro_share = c["balance_ratio"], c["hydro_share"]
+    demand_growth, reserve_margin = c["demand_growth"], c["reserve_margin"]
+    balance_score, hydro_score = c["balance_score"], c["hydro_score"]
+    growth_score, reserve_score = c["growth_score"], c["reserve_score"]
 
     rows = [
         {
