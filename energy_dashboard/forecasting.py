@@ -10,9 +10,17 @@ SCENARIOS = {
     "Dry year": {"demand_multiplier": 1.04, "hydro_multiplier": 0.88},
     "Wet year": {"demand_multiplier": 0.98, "hydro_multiplier": 1.08},
 }
+# Half-width multiplier for the illustrative model range (~90% two-sided under
+# a normal-residual assumption). The band is an uncalibrated sensitivity range,
+# not a probabilistic confidence interval.
+RANGE_Z = 1.64
 
 
 def build_monthly_history(national: pd.DataFrame) -> pd.DataFrame:
+    """Disaggregate up to ten years of annual totals into estimated monthly values.
+
+    Monthly shapes come from fixed seasonal weights, not observed monthly data.
+    """
     latest_year = int(national["year"].max())
     start_year = max(int(national["year"].min()), latest_year - 9)
     annual = national[national["year"].between(start_year, latest_year)].copy()
@@ -38,6 +46,12 @@ def build_monthly_history(national: pd.DataFrame) -> pd.DataFrame:
 
 
 def forecast_demand(national: pd.DataFrame, months: int, scenario: str) -> pd.DataFrame:
+    """Forecast monthly demand for ``months`` ahead and append it to the estimated history.
+
+    Unknown scenario names fall back to "Normal year".
+    """
+    if months < 1:
+        raise ValueError(f"months must be a positive integer, got {months}")
     monthly = build_monthly_history(national)
     series = monthly.set_index("date")["consumption_twh"].asfreq("MS")
     params = SCENARIOS.get(scenario, SCENARIOS["Normal year"])
@@ -67,8 +81,8 @@ def forecast_demand(national: pd.DataFrame, months: int, scenario: str) -> pd.Da
     forecast = forecast * params["demand_multiplier"]
     future = forecast.reset_index()
     future.columns = ["date", "forecast_twh"]
-    future["lower_twh"] = (future["forecast_twh"] - 1.64 * residual_std).clip(lower=0)
-    future["upper_twh"] = future["forecast_twh"] + 1.64 * residual_std
+    future["lower_twh"] = (future["forecast_twh"] - RANGE_Z * residual_std).clip(lower=0)
+    future["upper_twh"] = future["forecast_twh"] + RANGE_Z * residual_std
     future["scenario"] = scenario
     future["hydro_availability_index"] = params["hydro_multiplier"]
     future["period"] = "Forecast"

@@ -4,6 +4,8 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
+from energy_dashboard.policy import MODERATE_RISK_THRESHOLD, SECURE_THRESHOLD
+
 
 PALETTE = {
     "ink": "#1f2933",
@@ -16,6 +18,7 @@ PALETTE = {
     "violet": "#7c3aed",
     "cyan": "#0891b2",
     "panel": "#f6f8fb",
+    "zero_line": "#94a3b8",
 }
 
 
@@ -198,7 +201,7 @@ def balance_chart(national: pd.DataFrame) -> go.Figure:
             hovertemplate="<b>Year:</b> %{x}<br><b>Domestic gap:</b> %{y:.2f} TWh<extra>Production minus consumption before imports and exports.</extra>",
         )
     )
-    fig.add_hline(y=0, line_color="#94a3b8", line_width=1)
+    fig.add_hline(y=0, line_color=PALETTE["zero_line"], line_width=1)
     fig.update_layout(
         margin=dict(l=20, r=20, t=30, b=20),
         height=320,
@@ -316,7 +319,7 @@ def trade_chart(national: pd.DataFrame) -> go.Figure:
             hovertemplate="<b>Year:</b> %{x}<br><b>Net imports:</b> %{y:.2f} TWh<extra>Imports minus exports. Higher values indicate greater import dependence.</extra>",
         )
     )
-    fig.add_hline(y=0, line_color="#94a3b8", line_width=1)
+    fig.add_hline(y=0, line_color=PALETTE["zero_line"], line_width=1)
     fig.update_layout(
         barmode="relative",
         margin=dict(l=20, r=20, t=30, b=20),
@@ -360,7 +363,7 @@ def time_intelligence_chart(national: pd.DataFrame) -> go.Figure:
             hovertemplate="<b>Year:</b> %{x}<br><b>Trend deviation:</b> %{y:.1f}%<extra>Latest demand compared with the 3-year rolling demand trend.</extra>",
         )
     )
-    fig.add_hline(y=0, line_color="#94a3b8", line_width=1)
+    fig.add_hline(y=0, line_color=PALETTE["zero_line"], line_width=1)
     fig.update_layout(
         barmode="group",
         margin=dict(l=20, r=20, t=30, b=20),
@@ -413,11 +416,11 @@ def security_gauge(score: float, label: str) -> go.Figure:
                 "axis": {"range": [0, 100]},
                 "bar": {"color": PALETTE["ink"]},
                 "steps": [
-                    {"range": [0, 50], "color": "#fee2e2"},
-                    {"range": [50, 75], "color": "#fef3c7"},
-                    {"range": [75, 100], "color": "#dcfce7"},
+                    {"range": [0, MODERATE_RISK_THRESHOLD], "color": "#fee2e2"},
+                    {"range": [MODERATE_RISK_THRESHOLD, SECURE_THRESHOLD], "color": "#fef3c7"},
+                    {"range": [SECURE_THRESHOLD, 100], "color": "#dcfce7"},
                 ],
-                "threshold": {"line": {"color": PALETTE["red"], "width": 3}, "value": 50},
+                "threshold": {"line": {"color": PALETTE["red"], "width": 3}, "value": MODERATE_RISK_THRESHOLD},
             },
         )
     )
