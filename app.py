@@ -63,9 +63,12 @@ def ensure_national_metrics(national: pd.DataFrame) -> pd.DataFrame:
             national["production_twh"] + national["imports_twh"] - national["consumption_twh"] - national["exports_twh"]
         )
     if "surplus_deficit_twh" not in national:
-        national["surplus_deficit_twh"] = national["domestic_gap_twh"]
+        # Match data_sources.load_energy_dataset: surplus/deficit is the post-trade net balance.
+        national["surplus_deficit_twh"] = national["net_balance_twh"]
     if "hydro_share_pct" not in national:
-        national["hydro_share_pct"] = national["hydro_twh"] / national["production_twh"] * 100
+        national["hydro_share_pct"] = (
+            national["hydro_twh"] / national["production_twh"].where(national["production_twh"].gt(0)) * 100
+        )
     national["net_imports_twh"] = national["imports_twh"] - national["exports_twh"]
 
     return national
