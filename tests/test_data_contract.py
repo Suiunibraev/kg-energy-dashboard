@@ -64,6 +64,7 @@ def test_regional_data_contract():
     assert regional["data_quality"].eq("Official").all()
     assert regional["data_provenance"].str.len().gt(0).all()
     assert regional["source_url"].str.startswith("https://esep.energo.kg/").all()
+    assert regional["source_url"].nunique() == 1, "all rows cite the same annual balance PDF"
     assert regional["source_organization"].eq("Kyrgyz Electricity Settlement Center").all()
     assert regional["metric"].eq("Useful electricity supply through PES networks").all()
     assert abs(regional["useful_supply_gwh"].sum() - 12_597.767126) < 1e-6
