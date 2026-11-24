@@ -61,7 +61,8 @@ flowchart TD
     D --> G["energy_dashboard/ui.py<br/>Plotly charts and theme"]
     F --> D
     D --> H["energy_dashboard/reporting.py<br/>Executive PDF briefing"]
-    I["tests/test_data_contract.py"] --> B
+    I["tests/"] --> B
+    I --> H
     I --> E
     I --> F
 ```
@@ -79,6 +80,8 @@ flowchart TD
 | `data/regional_useful_supply_2024.csv` | Official 2024 useful electricity supply by ПЭС service territory |
 | `docs/MINISTRY_ONE_PAGER.md` | Non-technical Ministry handoff document |
 | `tests/test_data_contract.py` | Data, forecast, policy, and regional contract checks |
+| `tests/test_forecasting.py` | Monthly disaggregation, forecast horizon, band ordering, and scenario direction |
+| `tests/test_reporting.py` | End-to-end smoke test for the Executive Energy Briefing PDF |
 
 ## Data Sources and Data Quality
 
@@ -281,11 +284,7 @@ Run the full test suite:
 python3 -m pytest -q
 ```
 
-If `pytest` is not installed, run the current contract tests directly:
-
-```bash
-python3 -c "from tests.test_data_contract import test_national_data_contract, test_regional_data_contract, test_forecast_contract, test_security_index_contract, test_policy_rules_contract, test_actions_do_not_use_unavailable_regional_risk; test_national_data_contract(); test_regional_data_contract(); test_forecast_contract(); test_security_index_contract(); test_policy_rules_contract(); test_actions_do_not_use_unavailable_regional_risk(); print('checks passed')"
-```
+Some tests use pytest fixtures (`tmp_path`, `monkeypatch`), so install `requirements-dev.txt` rather than calling test functions directly.
 
 ## Screenshots
 

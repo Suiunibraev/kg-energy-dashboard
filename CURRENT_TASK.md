@@ -1,5 +1,15 @@
 # Current Task Handoff
 
+## Latest Maintenance Pass
+
+- Fixed a truncated source URL on six regional CSV rows; all rows now cite the same 2024 annual balance PDF.
+- Consolidated Security Index component math in `energy_dashboard/policy.py`; scores are unchanged.
+- Security gauge colour bands now read the shared policy thresholds.
+- Regional loader validates required columns and population mapping.
+- `app.py` fallback `surplus_deficit_twh` now matches the loader (post-trade net balance).
+- PDF briefing carries title/author metadata.
+- Added `tests/test_forecasting.py` and `tests/test_reporting.py` (17 tests pass).
+
 ## What Was Being Worked On
 
 The latest work completed a Version 1 credibility-language pass without changing forecast values, scenarios, Security Index weights, or regional source values.
@@ -61,7 +71,7 @@ The relevant current files are:
 
 - Official ПЭС production and distribution-loss fields remain unavailable.
 - Regional balance, producer/consumer status, and risk ranking remain disabled.
-- The Security Index transparency work is implemented and visually verified; dedicated breakdown test coverage remains optional follow-up work.
+- The Security Index transparency work is implemented and visually verified. The index and its breakdown now share one implementation (`_security_components`), so they cannot drift apart.
 
 ## Verification Already Completed
 
