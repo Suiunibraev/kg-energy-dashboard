@@ -31,6 +31,9 @@ def build_ministry_briefing_pdf(
         leftMargin=1.1 * cm,
         topMargin=0.9 * cm,
         bottomMargin=1.0 * cm,
+        title=f"Kyrgyzstan Energy Situation Briefing {int(latest['year'])}",
+        author="Kyrgyzstan Energy Intelligence Dashboard",
+        subject="Electricity security briefing for strategic planning",
     )
     styles = getSampleStyleSheet()
     styles.add(
